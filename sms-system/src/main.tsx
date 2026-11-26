@@ -16,6 +16,8 @@ import { installChunkReloadGuard } from '@/lib/chunkReload';
 import { installErrorReporting } from '@/lib/reportError';
 import ConnectionBanner from '@/components/ConnectionBanner';
 import NavigationGuardProvider from '@/components/NavigationGuardProvider';
+import UpdateController from '@/components/UpdateController';
+import { installServiceWorker } from '@/lib/serviceWorker/swRegistration';
 
 initTheme();
 // Pages load on demand; a tab left open across a deploy can ask for a chunk that was replaced.
@@ -36,6 +38,7 @@ createRoot(document.getElementById('root')!).render(
           <CurrentTermProvider>
             <ToastProvider>
               <ConnectionBanner />
+              <UpdateController />
               <NavigationGuardProvider>
                 <App />
               </NavigationGuardProvider>
@@ -49,3 +52,7 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+// Keeps the app's code on this device so a signed-in tab can reload offline, and switches to a new version only at a
+// safe moment (see swRegistration.ts and components/UpdateController.tsx). Production builds only.
+installServiceWorker();

@@ -19,5 +19,5 @@ export const lockScreenText = {
   triesLeft: (left: number) => `${left} ${left === 1 ? "try" : "tries"} left.`,
   signOutWarning: (online: boolean) =>
     "Signing out deletes this device's unsaved drafts. Unsent register saves are kept and sent at your next sign-in." +
-    (online ? "" : " The sign-in page won't open until you're back online."),
+    (online ? "" : " You can't sign in again until you're back online."),
 };

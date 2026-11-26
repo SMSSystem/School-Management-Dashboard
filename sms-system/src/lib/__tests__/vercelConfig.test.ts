@@ -26,6 +26,10 @@ describe('vercel.json single-page-app rewrite', () => {
     }
   });
 
+  it('serves the service worker as itself, never the shell (slice E)', () => {
+    expect(matches('/sw.js')).toBe(false);
+  });
+
   it('does not send a missing /assets file to the shell', () => {
     for (const path of ['/assets/index-abc123.js', '/assets/GridsheetPDFModal-DRNN3QaL.js', '/assets/index-DXPL-rZ3.css']) {
       expect(matches(path), path).toBe(false);
@@ -53,10 +57,18 @@ const directives = new Map(
 const hostsOf = (name: string) => (directives.get(name) ?? []).filter((s) => /^(https|wss):/.test(s));
 
 describe('vercel.json security headers', () => {
-  it('has one rule, for every path, and still the single rewrite', () => {
-    expect(config.headers).toHaveLength(1);
+  it('has one rule for every path, one for the service worker, and still the single rewrite', () => {
+    expect(config.headers).toHaveLength(2);
     expect(rule).toBeDefined();
     expect(config.rewrites).toHaveLength(1);
+  });
+
+  it('never lets a cache keep an old service worker, so updates and the safety switch reach every device', () => {
+    // docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice E
+    const sw = config.headers.find((r) => r.source === '/sw.js');
+    const value = (key: string) => sw?.headers.find((h) => h.key === key)?.value;
+    expect(value('Cache-Control')).toBe('no-cache');
+    expect(value('Service-Worker-Allowed')).toBe('/');
   });
 
   it('sends the policy as Report-Only and has no enforcing one yet', () => {

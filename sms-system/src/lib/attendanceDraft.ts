@@ -245,6 +245,16 @@ export function clearAllDrafts(): void {
   } catch { /* non-fatal */ }
 }
 
+/**
+ * Whether the signed-in user has any unexpired register draft, in either register. The service worker's update waits
+ * while one exists (lib/serviceWorker/safeMoment.ts). False with no owner.
+ */
+export function hasAnyDraft(now = Date.now()): boolean {
+  if (!owner) return false;
+  if (encrypted) return [...cache.values()].some((envelope) => now - envelope.savedAt <= DRAFT_TTL_MS);
+  return plaintextDrafts(owner, now).length > 0;
+}
+
 /** At sign-in: drop drafts left behind by anyone else, and old-format ones. */
 export function dropForeignDrafts(uid: string): void {
   try {

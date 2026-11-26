@@ -37,13 +37,19 @@ Move an entry out when the work starts or the owner drops it. Keep school data o
 - **Why it waits:** most are expected to be deliberate, so the review is unlikely to find much, and each one needs a judgement.
 - **Starts when:** the periodic review has time, or the number grows noticeably.
 
+### Remove the glob override for workbox-build
+
+- **What:** `package.json` `overrides` pins `glob` to 14.0.5 under `workbox-build` (added with slice E). `workbox-build` 7.4.1 asks for `glob` ^11, which has a moderate advisory (GHSA-3g3m-2fjr-6pw4, fixed in 14.0.2). It's a build tool only, never shipped. Remove the override, then check `npm ls glob` and `npm audit`.
+- **Why it waits:** no `workbox-build` release asks for a fixed `glob` yet.
+- **Starts when:** a `workbox-build` (or `vite-plugin-pwa`) release depends on `glob` 14.0.2 or later.
+
 ## Offline and local data
 
 The first offline release keeps a teacher's unsent work safe when the connection drops after they have signed in. The entries below go further and are deferred.
 
 ### Full cold start offline
 
-- **What:** open the app and work with no internet at all, including after closing the tab or restarting the device. It needs a service worker (PWA), a sign-in that survives closing the tab, and class lists stored on the device.
+- **What:** open the app and work with no internet at all, including after closing the tab or restarting the device. The service worker (slice E) already keeps the app's code, so the app itself loads offline; what's missing is a sign-in that survives closing the tab, and class lists stored on the device.
 - **Why it waits:** it reverses two privacy decisions: sign-in ending when the tab closes, and no personal data left in the browser (issue #51). Class lists on a shared computer need their own protection, and iOS limits need testing on real devices.
 - **Starts when:** evidence from a school shows teachers often begin the day with no connection. Build it together with trusted device mode.
 
@@ -63,7 +69,7 @@ The first offline release keeps a teacher's unsent work safe when the connection
 
 - **What:** a "Lock" button in the top bar for staff who work offline, to lock the screen on purpose before stepping away from a shared computer while offline. Online, Logout already does the job.
 - **Why it waits:** slice D's idle lock already covers a computer left alone for 5 minutes while offline, and a manual lock adds a control to every staff screen.
-- **Starts when:** work starts on slice E (the service worker), so offline use of shared computers is reviewed as a whole.
+- **Starts when:** next, as its own small pull request after slice E (the service worker), so offline use of shared computers is reviewed as a whole. The owner chose to keep it out of slice E.
 
 ### SQLite for everything
 

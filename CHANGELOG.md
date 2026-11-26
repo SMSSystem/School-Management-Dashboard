@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.60.0 · **Last updated:** 2026-11-26
+**Current version:** v2.61.0 · **Last updated:** 2026-11-26
 
 ## Unreleased
 
@@ -10,8 +10,24 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.60.0"></a>
+<a id="v2.61.0"></a>
 <details open>
+<summary><strong>v2.61.0</strong> · 2026-11-26 · Offline App Loading and Safe Updates (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/124">#124</a>)</summary>
+
+**Added**
+
+- The app now keeps its own code on each device, never school data, so teachers, senior teachers and institution admins who are signed in can reload the page and open the attendance registers with no internet. The sign-in page also opens offline, though signing in still needs the connection.
+- Other pages opened offline now say they need the internet, instead of showing an error.
+- A new version of the app switches in by itself at a safe moment: when changing page online, with no register being marked and nothing waiting to send. Until then a small "Update ready" notice offers to update now.
+
+**Deploy notes**
+
+- Nothing to deploy. If the service worker ever needs to be removed from every device, add the Vercel environment variable `SERVICE_WORKER=remove` for Production and redeploy; delete it and redeploy to restore it. The steps are in the offline attendance spec (slice E).
+
+</details>
+
+<a id="v2.60.0"></a>
+<details>
 <summary><strong>v2.60.0</strong> · 2026-11-26 · Scoring with Rubrics (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/123">#123</a>)</summary>
 
 - **Added:** teachers can grade with an assignment's rubric: pick a level for each criterion in the Grade dialog, and the score fills in from the total (scaled to the column in a gradebook assignment). The score can still be changed, and using the rubric is optional.

@@ -1,17 +1,7 @@
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import {
-  getConnectionState,
-  subscribeConnection,
-} from "@/lib/connectionStatus";
+import { useDeviceOnline } from "@/hooks/useDeviceOnline";
 import {
   MAX_UNLOCK_FAILURES,
   afterPasswordCheck,
@@ -29,29 +19,6 @@ import { lockScreenText } from "@/lib/offline/idleLockText";
 // staff who work offline went idle while the device was offline. The page behind is unmounted, so no school data is
 // on screen or in the page; register drafts were already saved, encrypted, and come back after unlocking. The password
 // is checked against this tab's verifier (lib/offline/unlockVerifier.ts), with no network.
-
-const browserOnline = () =>
-  !(typeof navigator !== "undefined" && navigator.onLine === false);
-
-/** Online as the connection banner sees it: the browser says so and the app last reached its servers. */
-function useOnline(): boolean {
-  const state = useSyncExternalStore(
-    subscribeConnection,
-    getConnectionState,
-    getConnectionState,
-  );
-  const [browser, setBrowser] = useState(browserOnline);
-  useEffect(() => {
-    const update = () => setBrowser(browserOnline());
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-  return browser && !state.offline;
-}
 
 /** Signs out once, however many times it's asked. signOut changes on every render of the provider, hence the ref. */
 function useLeave(): () => void {
@@ -208,7 +175,7 @@ function SignOutChoice({
 
 export default function IdleLockScreen({ uid }: { uid: string }) {
   const { displayName, institution } = useAuth();
-  const online = useOnline();
+  const online = useDeviceOnline();
   const leave = useLeave();
   const canUnlock = hasVerifier(uid);
 
