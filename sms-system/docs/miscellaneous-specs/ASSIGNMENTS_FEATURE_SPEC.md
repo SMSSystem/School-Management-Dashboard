@@ -122,6 +122,10 @@ export type AssignmentDocument = {
   attachmentSize?: number; // bytes, pre-base64, for the ~500KB cap check (§8)
 
   rubricId?: string; // -> institutions/{id}/rubrics/{rubricId}
+  // Set once, at the first grade with a rubric: the grid as it was then is kept in assignments/{id}/rubric/frozen
+  // (RUBRICS_UPLOAD_SPEC.md section 6.13), and the rubric can't change afterwards.
+  rubricFrozenAt?: Timestamp;
+  rubricFrozenTitle?: string;
 
   gradingMode: "gradebook" | "standalone";
   gradebookColumnId?: string; // required iff gradingMode === 'gradebook'

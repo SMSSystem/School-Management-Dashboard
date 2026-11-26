@@ -17,8 +17,8 @@ _Nothing yet._
 - **Added:** the first time a submission is graded, the assignment keeps a copy of its rubric's criteria. Later edits to the shared rubric, or deleting it, no longer change how graded work was marked, and the page says when grading started.
 - **Fixed:** editing an assignment no longer drops its rubric: while the rubric list loads, or after the rubric was deleted, the picker keeps it and says so. Once grading has started, the rubric can't be changed.
 - **Fixed:** the assignment and exam edit forms show their Term, Subject and Class when they open, instead of blank fields that cleared when touched.
-- **Changed:** deleting a rubric says that graded assignments keep the grid they were graded with.
-- **Deploy notes:** `firebase deploy --only firestore:rules` (already done on 2026-11-25).
+- **Changed:** deleting, editing or replacing a shared rubric now says that graded assignments keep the grid they were graded with.
+- **Deploy notes:** `firebase deploy --only firestore:rules`, for the frozen grid's own document under each assignment.
 
 </details>
 

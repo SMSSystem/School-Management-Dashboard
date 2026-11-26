@@ -1363,6 +1363,8 @@ See [`RUBRICS_UPLOAD_SPEC.md`](miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md).
 - **No egress counter.** Firestore downloads have no monthly counter or kill switch, unlike Realtime Database files. Check the console monthly.
 - **The school limit is soft.** The limit of 200 files is in the UI only, because rules can't count documents.
 - **A teacher's delete can affect colleagues.** Their assignments not graded yet then show the rubric as missing; graded ones keep their frozen grid.
+- **A frozen grid isn't checked against the shared rubric.** The rules check its shape and that it names the assignment's rubric, not its content: comparing would cost a read per freeze, and any teacher can already edit the shared grid. The freeze also needs the grading page to have loaded the rubric; if it hasn't, the next grade freezes it.
+- **The mobile app** reads the shared rubric. Until it reads `rubric/frozen` for an assignment with `rubricFrozenAt`, it shows the current grid, not the frozen one.
 
 ---
 
