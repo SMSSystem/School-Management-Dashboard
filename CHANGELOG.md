@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.62.0"></a>
 <details open>
-<summary><strong>v2.62.0</strong> · 2026-11-26 · Lock Button for Offline Staff</summary>
+<summary><strong>v2.62.0</strong> · 2026-11-26 · Lock Button for Offline Staff (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/125">#125</a>)</summary>
 
 **Added**
 
