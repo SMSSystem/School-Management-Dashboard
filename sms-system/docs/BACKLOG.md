@@ -43,7 +43,7 @@ The first offline release keeps a teacher's unsent work safe when the connection
 
 ### Full cold start offline
 
-- **What:** open the app and work with no internet at all, including after closing the tab or restarting the device. It needs a service worker (PWA), a sign-in that survives closing the tab, and class lists stored on the device.
+- **What:** open the app and work with no internet at all, including after closing the tab or restarting the device. The service worker (slice E) already keeps the app's code, so the app itself loads offline; what's missing is a sign-in that survives closing the tab, and class lists stored on the device.
 - **Why it waits:** it reverses two privacy decisions: sign-in ending when the tab closes, and no personal data left in the browser (issue #51). Class lists on a shared computer need their own protection, and iOS limits need testing on real devices.
 - **Starts when:** evidence from a school shows teachers often begin the day with no connection. Build it together with trusted device mode.
 
@@ -63,7 +63,7 @@ The first offline release keeps a teacher's unsent work safe when the connection
 
 - **What:** a "Lock" button in the top bar for staff who work offline, to lock the screen on purpose before stepping away from a shared computer while offline. Online, Logout already does the job.
 - **Why it waits:** slice D's idle lock already covers a computer left alone for 5 minutes while offline, and a manual lock adds a control to every staff screen.
-- **Starts when:** work starts on slice E (the service worker), so offline use of shared computers is reviewed as a whole.
+- **Starts when:** next, as its own small pull request after slice E (the service worker), so offline use of shared computers is reviewed as a whole. The owner chose to keep it out of slice E.
 
 ### SQLite for everything
 
