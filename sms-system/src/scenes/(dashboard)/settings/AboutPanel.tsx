@@ -1,5 +1,6 @@
 import { APP_COMMIT, APP_ENV, APP_VERSION, CHANGELOG_URL } from "@/lib/appVersion";
 import type { Role } from "@/lib/firebase";
+import OutsideLink from "@/components/OutsideLink";
 
 // Settings → About: the version this tab runs (src/lib/appVersion.ts). The CHANGELOG lives in the
 // private repository, so only a super admin (an operator with access to it) gets the link.
@@ -18,14 +19,13 @@ const AboutPanel = ({ role }: { role: Role | null | undefined }) => (
       <dd className="text-gray-700 dark:text-gray-300">{APP_ENV}</dd>
     </dl>
     {role === "super_admin" && (
-      <a
+      <OutsideLink
         href={CHANGELOG_URL}
-        target="_blank"
-        rel="noreferrer"
+        leaving="changelog"
         className="inline-block mt-3 text-xs text-sky-600 hover:underline dark:text-sky-400"
       >
         What changed in each version (CHANGELOG)
-      </a>
+      </OutsideLink>
     )}
   </section>
 );
