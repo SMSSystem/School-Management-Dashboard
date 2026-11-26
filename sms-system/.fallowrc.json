@@ -9,7 +9,9 @@
     "scripts/*.mjs",
     "vitest.rules.config.ts",
     "rules-tests/**/*.ts",
-    "e2e/**/*.ts"
+    "e2e/**/*.ts",
+    // The service worker: vite-plugin-pwa builds it from vite.config.ts, and nothing imports it.
+    "src/sw.ts"
   ],
 
   "ignorePatterns": [

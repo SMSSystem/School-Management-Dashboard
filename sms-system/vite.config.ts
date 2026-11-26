@@ -1,10 +1,12 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
+import { selectPrecache, type ViteManifest } from './src/lib/serviceWorker/precacheSelection.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,14 +23,49 @@ function buildCommit(): string {
   }
 }
 
+// The service worker (src/sw.ts, docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md slice E). SERVICE_WORKER=remove
+// is the safety switch: the build's worker removes itself from every device on its next visit, and the app stops
+// registering one. Any other value, or none, is the normal worker.
+const swMode = process.env.SERVICE_WORKER === 'remove' ? 'remove' : 'on';
+
+const serviceWorker = VitePWA({
+  strategies: 'injectManifest',
+  srcDir: 'src',
+  filename: 'sw.ts',
+  injectRegister: false, // src/lib/serviceWorker/swRegistration.ts registers it
+  manifest: false, // not an installable app
+  selfDestroying: swMode === 'remove',
+  devOptions: { enabled: false },
+  injectManifest: {
+    globPatterns: ['**/*.{js,css,html,png,ico}'],
+    globIgnores: ['.vite/**'],
+    maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+    // Keep only the page, the core app and the registers (precacheSelection.ts), chosen from Vite's build manifest.
+    manifestTransforms: [
+      (entries) => {
+        const manifest = JSON.parse(
+          readFileSync(path.resolve(__dirname, 'dist/.vite/manifest.json'), 'utf8'),
+        ) as ViteManifest;
+        const keep = selectPrecache(manifest);
+        return { manifest: entries.filter((entry) => keep.has(entry.url)), warnings: [] };
+      },
+    ],
+  },
+});
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), serviceWorker],
+  build: {
+    // dist/.vite/manifest.json, read above to choose what the service worker keeps.
+    manifest: true,
+  },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
     __APP_COMMIT__: JSON.stringify(buildCommit()),
     __APP_ENV__: JSON.stringify(process.env.VERCEL_ENV ?? 'development'),
     // For the copyright line on the sign-in footer, so it never needs editing at New Year.
     __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
+    __SW_MODE__: JSON.stringify(swMode),
   },
   resolve: {
     alias: {
