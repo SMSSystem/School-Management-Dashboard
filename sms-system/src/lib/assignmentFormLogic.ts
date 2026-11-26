@@ -345,7 +345,7 @@ export function rubricPickerOptions(
 
 /** The frozen rubric's title when grading has started on the assignment being edited (rubricFreeze.ts), else undefined. */
 export function frozenRubricTitle(data: AssignmentFormRecord | undefined): string | undefined {
-  const frozen = (data as Record<string, unknown> | undefined)?.rubricFrozen as { title?: unknown } | undefined;
-  if (!frozen) return undefined;
-  return typeof frozen.title === "string" ? frozen.title : "Untitled rubric";
+  const record = data as Record<string, unknown> | undefined;
+  if (!record?.rubricFrozenAt) return undefined;
+  return typeof record.rubricFrozenTitle === "string" ? record.rubricFrozenTitle : "Untitled rubric";
 }

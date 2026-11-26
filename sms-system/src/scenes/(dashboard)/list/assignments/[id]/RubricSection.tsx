@@ -106,9 +106,9 @@ function RubricDetails({
   return (
     <>
       <p className="text-sm font-medium">{rubric.title}</p>
-      {assignment.rubricFrozen && (
+      {assignment.rubricFrozenAt && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {frozenRubricNote(assignment.rubricFrozen.frozenAt)}
+          {frozenRubricNote(assignment.rubricFrozenAt)}
         </p>
       )}
       {rubric.description && (

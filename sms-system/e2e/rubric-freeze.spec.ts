@@ -32,19 +32,34 @@ const TEST_PDF_PATH = "e2e/.fixtures/qa-submission.pdf";
 const STUDENT_EMAIL = process.env.QA_ASSIGNMENTS_STUDENT_EMAIL;
 const STUDENT_PASSWORD = process.env.QA_ASSIGNMENTS_STUDENT_PASSWORD;
 
-const institution = async () => adminDb!.collection("institutions").doc(await institutionId());
-const rubricRef = async () => (await institution()).collection("rubrics").doc(RUBRIC_ID);
+const institution = async () =>
+  adminDb!.collection("institutions").doc(await institutionId());
+const rubricRef = async () =>
+  (await institution()).collection("rubrics").doc(RUBRIC_ID);
 const assignmentsTitled = async (title: string) =>
-  (await (await institution()).collection("assignments").where("title", "==", title).get()).docs;
+  (
+    await (await institution())
+      .collection("assignments")
+      .where("title", "==", title)
+      .get()
+  ).docs;
 const grid = (name: string) => [
-  { id: "c1", name, maxPoints: 4, levels: [{ label: "Good", points: 4, description: "" }] },
+  {
+    id: "c1",
+    name,
+    maxPoints: 4,
+    levels: [{ label: "Good", points: 4, description: "" }],
+  },
 ];
 
 async function removeFixtures(): Promise<void> {
   const inst = await institution();
   for (const title of [GRADED, UNGRADED]) {
     for (const a of await assignmentsTitled(title)) {
-      const results = await inst.collection("results").where("assignmentId", "==", a.id).get();
+      const results = await inst
+        .collection("results")
+        .where("assignmentId", "==", a.id)
+        .get();
       await Promise.all(results.docs.map((r) => r.ref.delete()));
       await adminDb!.recursiveDelete(a.ref);
     }
@@ -55,7 +70,9 @@ async function removeFixtures(): Promise<void> {
 test.beforeAll(async () => {
   test.skip(!HAS_ADMIN_SDK, "scripts/service-account.json is required");
   await removeFixtures();
-  await (await rubricRef()).set({
+  await (
+    await rubricRef()
+  ).set({
     institutionId: await institutionId(),
     title: RUBRIC_TITLE,
     criteria: grid("Original criterion"),
@@ -72,12 +89,19 @@ test("grading freezes the grid, which later edits and the rubric's deletion don'
   page,
   context,
 }) => {
-  test.skip(!INSTITUTION_NAME || !TEACHER_EMAIL || !STUDENT_EMAIL, "QA_* credentials missing from .env.qa");
+  test.skip(
+    !INSTITUTION_NAME || !TEACHER_EMAIL || !STUDENT_EMAIL,
+    "QA_* credentials missing from .env.qa",
+  );
   test.setTimeout(300_000);
   await forceLiveData(context);
 
   await test.step("the teacher creates two assignments that use the rubric", async () => {
-    await login(page, { institutionLabel: INSTITUTION_NAME!, email: TEACHER_EMAIL!, password: TEACHER_PASSWORD! });
+    await login(page, {
+      institutionLabel: INSTITUTION_NAME!,
+      email: TEACHER_EMAIL!,
+      password: TEACHER_PASSWORD!,
+    });
     await dismissTourIfPresent(page);
     for (const [title, offset] of [
       [GRADED, GRADED_OFFSET],
@@ -97,43 +121,85 @@ test("grading freezes the grid, which later edits and the rubric's deletion don'
   });
 
   await test.step("the student submits the first", async () => {
-    await login(page, { institutionLabel: INSTITUTION_NAME!, email: STUDENT_EMAIL!, password: STUDENT_PASSWORD! });
+    await login(page, {
+      institutionLabel: INSTITUTION_NAME!,
+      email: STUDENT_EMAIL!,
+      password: STUDENT_PASSWORD!,
+    });
     await ensurePastChangePassword(page, STUDENT_PASSWORD!);
     await dismissTourIfPresent(page);
     await openAssignment(page, CLASS_A_NAME, GRADED_OFFSET);
     if (!(await submissionExists(page, STUDENT_EMAIL!))) {
       await page.locator('input[type="file"]').setInputFiles(TEST_PDF_PATH);
-      await expect(page.getByText("Submitted", { exact: true })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("Submitted", { exact: true })).toBeVisible({
+        timeout: 15_000,
+      });
       await waitForSavedSubmission(page, STUDENT_EMAIL!);
     }
     await logout(page);
   });
 
   await test.step("the teacher grades it, which freezes the rubric's grid on the assignment", async () => {
-    await login(page, { institutionLabel: INSTITUTION_NAME!, email: TEACHER_EMAIL!, password: TEACHER_PASSWORD! });
+    await login(page, {
+      institutionLabel: INSTITUTION_NAME!,
+      email: TEACHER_EMAIL!,
+      password: TEACHER_PASSWORD!,
+    });
     await dismissTourIfPresent(page);
     await openAssignment(page, CLASS_A_NAME, GRADED_OFFSET);
-    const gradeButton = page.getByRole("button", { name: /^(Grade|Re-grade)$/ });
+    const gradeButton = page.getByRole("button", {
+      name: /^(Grade|Re-grade)$/,
+    });
     for (let attempt = 0; attempt < 3; attempt++) {
-      if (await gradeButton.isVisible({ timeout: 8_000 }).catch(() => false)) break;
+      if (await gradeButton.isVisible({ timeout: 8_000 }).catch(() => false))
+        break;
       await page.reload();
       await dismissTourIfPresent(page);
     }
     await gradeButton.click();
-    await page.locator('xpath=//label[normalize-space(text())="Score"]/following-sibling::input[1]').fill("3");
-    await page.locator('xpath=//label[normalize-space(text())="Max Score"]/following-sibling::input[1]').fill("4");
+    await page
+      .locator(
+        'xpath=//label[normalize-space(text())="Score"]/following-sibling::input[1]',
+      )
+      .fill("3");
+    await page
+      .locator(
+        'xpath=//label[normalize-space(text())="Max Score"]/following-sibling::input[1]',
+      )
+      .fill("4");
     await page.getByRole("button", { name: "Save Grade", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /^Grade —/ })).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: /^Grade —/ })).toHaveCount(
+      0,
+      { timeout: 10_000 },
+    );
+    // The grid is in the assignment's rubric/frozen document; the assignment itself carries only the marker.
     await expect
-      .poll(async () => (await assignmentsTitled(GRADED))[0]?.data().rubricFrozen?.criteria?.[0]?.name, { timeout: 30_000 })
+      .poll(
+        async () => {
+          const graded = (await assignmentsTitled(GRADED))[0];
+          return graded
+            ? (await graded.ref.collection("rubric").doc("frozen").get()).data()
+                ?.criteria?.[0]?.name
+            : undefined;
+        },
+        { timeout: 30_000 },
+      )
       .toBe("Original criterion");
+    const marked = (await assignmentsTitled(GRADED))[0].data();
+    expect(marked.rubricFrozenTitle).toBe(RUBRIC_TITLE);
+    expect(marked.rubricFrozenAt).toBeTruthy();
+    expect(marked).not.toHaveProperty("rubricFrozen");
   });
 
   await test.step("editing the shared rubric doesn't change the graded assignment", async () => {
     await (await rubricRef()).update({ criteria: grid("Changed criterion") });
     await page.reload();
     await dismissTourIfPresent(page);
-    await expect(page.getByText("This is the rubric as it was when grading started", { exact: false })).toBeVisible({
+    await expect(
+      page.getByText("This is the rubric as it was when grading started", {
+        exact: false,
+      }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText("Original criterion").first()).toBeVisible();
@@ -144,8 +210,34 @@ test("grading freezes the grid, which later edits and the rubric's deletion don'
     await (await rubricRef()).delete();
     await page.reload();
     await dismissTourIfPresent(page);
-    await expect(page.getByText("Original criterion").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Original criterion").first()).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByText(/Rubric not found/)).toHaveCount(0);
+  });
+
+  await test.step("editing the graded assignment keeps its frozen rubric", async () => {
+    await page.goto("/dashboard/list/assignments");
+    await dismissTourIfPresent(page);
+    const row = assignmentRow(page, CLASS_A_NAME, GRADED_OFFSET);
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await row
+      .getByRole("button", { name: /^Edit / })
+      .first()
+      .click();
+    await expect(
+      page.getByText("The rubric can't change once grading has started."),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('select[name="rubricId"]')).toHaveCount(0);
+    await page.locator('input[name="title"]').fill(`${GRADED} `);
+    await page.locator('input[name="title"]').fill(GRADED);
+    await page.getByRole("button", { name: "Update", exact: true }).click();
+    await expect(page.locator('input[name="title"]')).toHaveCount(0, {
+      timeout: 15_000,
+    });
+    expect((await assignmentsTitled(GRADED))[0]?.data().rubricId).toBe(
+      RUBRIC_ID,
+    );
   });
 
   await test.step("editing the ungraded assignment keeps its link to the deleted rubric", async () => {
@@ -153,14 +245,24 @@ test("grading freezes the grid, which later edits and the rubric's deletion don'
     await dismissTourIfPresent(page);
     const row = assignmentRow(page, CLASS_A_NAME, UNGRADED_OFFSET);
     await expect(row).toBeVisible({ timeout: 15_000 });
-    await row.getByRole("button", { name: /^Edit / }).first().click();
+    await row
+      .getByRole("button", { name: /^Edit / })
+      .first()
+      .click();
     const picker = page.locator('select[name="rubricId"]');
-    await expect(picker.locator("option:checked")).toHaveText("Deleted rubric (no longer available)", { timeout: 15_000 });
+    await expect(picker.locator("option:checked")).toHaveText(
+      "Deleted rubric (no longer available)",
+      { timeout: 15_000 },
+    );
     // Focusing and leaving the picker used to clear a rubric it had no option for.
     await picker.focus();
     await page.locator('input[name="title"]').focus();
     await page.getByRole("button", { name: "Update", exact: true }).click();
-    await expect(page.locator('input[name="title"]')).toHaveCount(0, { timeout: 15_000 });
-    expect((await assignmentsTitled(UNGRADED))[0]?.data().rubricId).toBe(RUBRIC_ID);
+    await expect(page.locator('input[name="title"]')).toHaveCount(0, {
+      timeout: 15_000,
+    });
+    expect((await assignmentsTitled(UNGRADED))[0]?.data().rubricId).toBe(
+      RUBRIC_ID,
+    );
   });
 });

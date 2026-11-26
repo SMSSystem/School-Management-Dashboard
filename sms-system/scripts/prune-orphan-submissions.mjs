@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Removes students' submissions left behind by assignments that were deleted before the app deleted them too: every
- * submission, attempt and submission tombstone under an assignment id whose assignment document no longer exists.
+ * submission, attempt and submission tombstone under an assignment id whose assignment document no longer exists, and
+ * anything else under that path (such as a frozen rubric grid, rubric/frozen), since --live deletes the path recursively.
  *
  * Why: until the assignment delete cascade (src/lib/assignmentDelete.ts), deleting an assignment removed only the
  * assignment document. Its submissions stayed, each with a file of up to 500 KB, and nothing ever removed them.

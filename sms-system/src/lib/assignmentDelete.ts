@@ -15,6 +15,7 @@ import {
   institutionCollection,
   institutionDoc,
   institutionSubcollection,
+  institutionSubdoc,
 } from "./paths";
 import { chunkOperations } from "./deleteUserData";
 import { deleteBlob } from "./blobStore";
@@ -90,6 +91,8 @@ export async function deleteAssignmentCascade(p: {
     ...attemptDocs.flatMap((a) => a.docs.map((d) => d.ref)),
     ...submissionDocs.docs.map((d) => d.ref),
     ...tombstoneDocs.docs.map((d) => d.ref),
+    // The rubric's grid frozen at the first grade (rubricFreeze.ts), if any: deleting a missing document is fine.
+    institutionSubdoc(p.institutionId, "assignments", p.assignmentId, "rubric", "frozen"),
   ];
   for (const group of chunkOperations(refs)) {
     const batch = writeBatch(db);

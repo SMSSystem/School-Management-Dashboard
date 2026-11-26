@@ -175,6 +175,7 @@ describe("the tree of collections", () => {
       "assignments/submissions",
       "assignments/submissions/attempts",
       "assignments/submissionTombstones",
+      "assignments/rubric",
       "exams/content",
       "exams/private",
       "exams/attempts",
