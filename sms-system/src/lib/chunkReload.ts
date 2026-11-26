@@ -2,9 +2,10 @@
 // file name. A tab opened before a deploy can therefore ask for a chunk that no longer exists.
 // Vite reports that as a "vite:preloadError" event; the fix is to load the new version of the app.
 //
-// Reload at most once a minute, and never while offline: there is no service worker, so reloading
-// an offline tab would replace the app with the browser's error page. In those cases the error
-// reaches PageErrorBoundary, which offers a Reload button.
+// Reload at most once a minute, and never while offline: the service worker keeps only the core app
+// and the registers' code (lib/serviceWorker/precacheSelection.ts), so a reload can't fetch the
+// missing chunk either. In those cases the error reaches PageErrorBoundary, which says offline that
+// the page needs the internet, and online offers a Reload button.
 
 export const CHUNK_RELOAD_KEY = "sms_chunk_reload_at";
 export const CHUNK_RELOAD_WINDOW_MS = 60_000;

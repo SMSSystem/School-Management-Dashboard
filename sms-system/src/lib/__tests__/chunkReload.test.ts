@@ -18,7 +18,7 @@ describe('shouldReloadForChunkError', () => {
     expect(shouldReloadForChunkError({ online: true, now, lastReloadAt: null })).toBe(true);
   });
 
-  it('never reloads while offline (there is no service worker to show the app)', () => {
+  it('never reloads while offline (the missing chunk is not kept on the device, so a reload cannot fetch it)', () => {
     expect(shouldReloadForChunkError({ online: false, now, lastReloadAt: null })).toBe(false);
   });
 

@@ -94,13 +94,14 @@ describe("lock screen wording", () => {
     expect(lockScreenText.triesLeft(1)).toBe("1 try left.");
   });
 
-  it("warns what signing out loses, and that the sign-in page needs the connection", () => {
+  it("warns what signing out loses, and that signing in again needs the connection", () => {
     expect(lockScreenText.signOutWarning(true)).toMatch(
       /Unsent register saves are kept/,
     );
-    expect(lockScreenText.signOutWarning(true)).not.toMatch(/won't open/);
+    expect(lockScreenText.signOutWarning(true)).not.toMatch(/can't sign in/);
+    // Since slice E the sign-in page itself opens offline (the service worker keeps it); signing in needs the network.
     expect(lockScreenText.signOutWarning(false)).toMatch(
-      /won't open until you're back online/,
+      /can't sign in again until you're back online/,
     );
   });
 });
