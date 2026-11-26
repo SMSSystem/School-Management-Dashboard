@@ -26,7 +26,8 @@ export type GradeSubmissionParams = {
   graderName: string;
   // The rubric the page shows, so the first grade can freeze its grid on the assignment (rubricFreeze.ts).
   rubric?: { title?: string; description?: string; criteria?: RubricCriterion[] } | null;
-  // Set when the grade was scored with the rubric; a re-grade without it removes the saved scores.
+  // The rubric scores: written when set, removed when null (a grid was shown and not used), and left as they are when
+  // undefined (no grid was shown, for instance because it hadn't loaded).
   rubricScoring?: RubricScoring | null;
 };
 
@@ -118,16 +119,18 @@ export async function gradeSubmission(params: GradeSubmissionParams): Promise<vo
 }
 
 /**
- * The submission's feedback and rubric fields at a grade. Each is written, or removed when absent, so clearing the
- * feedback or grading without the rubric on a re-grade doesn't leave the old text or scores behind.
+ * The submission's feedback and rubric fields at a grade. Feedback is written, or removed when empty, so clearing it on
+ * a re-grade doesn't leave the old text. Rubric scores are written, removed when null, or left alone when undefined, so
+ * a grade saved before the grid loaded doesn't remove the saved scores.
  */
 function feedbackAndRubricFields(feedback: string | undefined, scoring: RubricScoring | null | undefined) {
-  return {
-    feedback: feedback ? feedback : deleteField(),
-    ...(scoring
-      ? { rubricScores: scoring.scores, rubricTotal: scoring.total, rubricMax: scoring.max }
-      : { rubricScores: deleteField(), rubricTotal: deleteField(), rubricMax: deleteField() }),
-  };
+  const rubric =
+    scoring === undefined
+      ? {}
+      : scoring
+        ? { rubricScores: scoring.scores, rubricTotal: scoring.total, rubricMax: scoring.max }
+        : { rubricScores: deleteField(), rubricTotal: deleteField(), rubricMax: deleteField() };
+  return { feedback: feedback ? feedback : deleteField(), ...rubric };
 }
 
 // One grade's batch: the submission's grade, the tombstone, the result, and (at the first grade) the frozen rubric.

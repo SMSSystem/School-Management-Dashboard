@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { RubricScorePicker } from "../../scenes/(dashboard)/list/assignments/[id]/RubricScorePicker";
 import gradingRaw from "../grading.ts?raw";
 import rulesRaw from "../../../firestore.rules?raw";
 import dialogRaw from "../../scenes/(dashboard)/list/assignments/[id]/GradeDialog.tsx?raw";
@@ -152,6 +155,31 @@ describe("saving and reading back", () => {
   });
 });
 
+describe("the Grade dialog's picker", () => {
+  it("shows each level's description, the cap note, and the picked level as pressed", () => {
+    const html = renderToStaticMarkup(
+      createElement(RubricScorePicker, {
+        criteria: [
+          {
+            ...criteria[1],
+            levels: [
+              { label: "Strong", points: 8, description: "Clear and varied" },
+              criteria[1].levels[1],
+            ],
+          },
+        ],
+        picks: { c2: { points: 6, level: "Strong" } },
+        onChange: () => {},
+        disabled: false,
+      }),
+    );
+    expect(html).toContain("Clear and varied");
+    expect(html).toContain("Counts as the criterion&#x27;s max, not 8");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Strong/);
+    expect(html).not.toContain("title=");
+  });
+});
+
 describe("the wiring", () => {
   it("writes the scores with the grade, or removes them, and removes cleared feedback", () => {
     const src = flat(gradingRaw);
@@ -172,6 +200,8 @@ describe("the wiring", () => {
       flat("...feedbackAndRubricFields(feedback, rubricScoring),"),
     );
     expect(src).not.toContain(flat("...(feedback ? { feedback } : {}),"));
+    // Left alone when no grid was shown, so a grade saved before the grid loaded keeps the saved scores.
+    expect(src).toContain(flat("scoring === undefined ? {} : scoring ?"));
   });
 
   it("lets only a grader write them, checked by validRubricScores", () => {
@@ -190,7 +220,12 @@ describe("the wiring", () => {
     const page = flat(pageRaw);
     expect(page).toContain(flat("const checked = gradeToSave("));
     expect(page).toContain(flat("rubricScoring,\n      });"));
-    expect(page).toContain(flat("setRubricPicks(form.picks);"));
+    expect(page).toContain(flat("setRubricPicks(null);"));
+    expect(page).toContain(
+      flat(
+        "effectivePicks(rubricPicks, criteria, submissionsByStudent[gradingTarget.uid])",
+      ),
+    );
     // A pick clears the error about the last picks.
     expect(page).toContain(
       flat("setRubricPicks(picks); setGradingError(null);"),

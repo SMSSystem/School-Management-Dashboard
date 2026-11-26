@@ -9,6 +9,7 @@ import AssignmentAttachment from "@/components/AssignmentAttachment";
 import {
   assignmentTypeLabel,
   canViewRoster,
+  effectivePicks,
   gradeToSave,
   gradingFormFor,
   type RosterStudent,
@@ -69,7 +70,8 @@ const AssignmentDetailPage = () => {
   const [gradeScore, setGradeScore] = useState("");
   const [gradeMaxScore, setGradeMaxScore] = useState("");
   const [gradeFeedback, setGradeFeedback] = useState("");
-  const [rubricPicks, setRubricPicks] = useState<RubricPicks>({});
+  // null until the teacher picks: until then the dialog shows the saved scores (effectivePicks).
+  const [rubricPicks, setRubricPicks] = useState<RubricPicks | null>(null);
   const criteria = rubric?.criteria ?? [];
   const [gradingLoading, setGradingLoading] = useState(false);
   const [gradingError, setGradingError] = useState<string | null>(null);
@@ -135,13 +137,12 @@ const AssignmentDetailPage = () => {
       submission,
       assignment?.gradingMode,
       gradebookColumnMaxScore,
-      criteria,
     );
     setGradingError(null);
     setGradeScore(form.score);
     setGradeMaxScore(form.maxScore);
     setGradeFeedback(form.feedback);
-    setRubricPicks(form.picks);
+    setRubricPicks(null);
     setGradingTarget(student);
   };
 
@@ -164,7 +165,7 @@ const AssignmentDetailPage = () => {
       gradeScore,
       gradeMaxScore,
       criteria,
-      rubricPicks,
+      effectivePicks(rubricPicks, criteria, submissionsByStudent[gradingTarget.uid]),
     );
     if ("error" in checked) {
       setGradingError(checked.error);
@@ -340,7 +341,11 @@ const AssignmentDetailPage = () => {
           gradeFeedback={gradeFeedback}
           setGradeFeedback={setGradeFeedback}
           criteria={criteria}
-          rubricPicks={rubricPicks}
+          rubricPicks={effectivePicks(
+            rubricPicks,
+            criteria,
+            submissionsByStudent[gradingTarget.uid],
+          )}
           setRubricPicks={pickRubric}
           gradebookColumnMaxScore={gradebookColumnMaxScore}
           gradingError={gradingError}

@@ -78,7 +78,7 @@ function ScoreFields({
           {rubricScore !== null && " The rubric total is scaled to it."}
         </p>
       )}
-      {rubricScore !== null && gradeScore !== rubricScore && (
+      {rubricScore !== null && Number(gradeScore) !== Number(rubricScore) && (
         <p className="text-xs text-amber-700 dark:text-amber-300 -mt-2">
           Score was changed from the rubric total ({rubricScore}). The rubric
           scores are still saved.

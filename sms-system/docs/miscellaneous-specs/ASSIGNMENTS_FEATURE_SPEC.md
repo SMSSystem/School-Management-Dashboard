@@ -165,6 +165,11 @@ export type SubmissionDocument = {
   gradedBy?: string;
   gradedByName?: string;
   gradedAt?: Timestamp;
+  // Set together when the grade was scored with the rubric (RUBRICS_UPLOAD_SPEC.md section 6.14), on the rubric's
+  // own scale: one { criterionId, points, level? } per criterion of the frozen grid, their total and the max.
+  rubricScores?: RubricScore[];
+  rubricTotal?: number;
+  rubricMax?: number;
 
   // Retention (§9) — denormalized from the parent assignment's dueDate at
   // write time, same pattern as departmentId/teacherRole elsewhere in this

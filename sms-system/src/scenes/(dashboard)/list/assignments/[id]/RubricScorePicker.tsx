@@ -64,11 +64,12 @@ function PointsBox({ criterion, picks, onChange, disabled }: PickerProps) {
   );
 }
 
-// A button per level; pressing the picked one again unpicks it.
+// A button per level, with its description so it can be read on a touch screen; pressing the picked one again
+// unpicks it.
 function LevelButtons({ criterion, picks, onChange, disabled }: PickerProps) {
   const picked = picks[criterion.id]?.level;
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid gap-2 sm:grid-cols-2">
       {criterion.levels.map((level, i) => {
         const pressed = picked === level.label;
         const points = levelPoints(level, criterion);
@@ -79,7 +80,6 @@ function LevelButtons({ criterion, picks, onChange, disabled }: PickerProps) {
             type="button"
             aria-pressed={pressed}
             disabled={disabled}
-            title={level.description}
             onClick={() => onChange(withPick(picks, criterion.id, pick))}
             className={LEVEL_BTN_CLS}
           >
@@ -87,6 +87,11 @@ function LevelButtons({ criterion, picks, onChange, disabled }: PickerProps) {
             {isCapped(level, criterion) && (
               <span className="block font-normal text-amber-700 dark:text-amber-300">
                 Counts as the criterion's max, not {level.points}
+              </span>
+            )}
+            {level.description && (
+              <span className="mt-0.5 block font-normal text-gray-500 dark:text-gray-400">
+                {level.description}
               </span>
             )}
           </button>

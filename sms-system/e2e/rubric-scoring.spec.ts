@@ -78,7 +78,7 @@ test.beforeAll(async () => {
         maxPoints: 4,
         levels: [
           { label: "Excellent", points: 4, description: "" },
-          { label: "Fair", points: 2, description: "" },
+          { label: "Fair", points: 2, description: "Some relevant points" },
         ],
       },
       { id: "c2", name: "Sources", maxPoints: 6, levels: [] },
@@ -159,6 +159,12 @@ test("a teacher scores each criterion; the student sees the score and the awarde
     await login(page, teacher);
     await dismissTourIfPresent(page);
     await openGrade();
+    // The level's description shows in its button, for a touch screen.
+    await expect(
+      page
+        .getByRole("button", { name: /^Fair/ })
+        .getByText("Some relevant points"),
+    ).toBeVisible();
     await page.getByRole("button", { name: /^Fair/ }).click();
     await expect(page.locator(field("Score"))).toHaveValue("2");
     await expect(page.locator(field("Max Score"))).toHaveValue("10");

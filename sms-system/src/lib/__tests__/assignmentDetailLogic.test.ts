@@ -8,6 +8,7 @@ import {
   canEditAssignment,
   canViewRoster,
   conversionColumnsOf,
+  effectivePicks,
   formatDueDate,
   gradeToSave,
   gradingFormFor,
@@ -104,12 +105,11 @@ describe('buildRoster', () => {
 
 describe('gradingFormFor', () => {
   it('starts empty for an ungraded submission, and with the saved grade, maximum and feedback for a graded one', () => {
-    expect(gradingFormFor(undefined, 'standalone', null)).toEqual({ score: '', maxScore: '', feedback: '', picks: {} });
+    expect(gradingFormFor(undefined, 'standalone', null)).toEqual({ score: '', maxScore: '', feedback: '' });
     expect(gradingFormFor({ grade: 7, maxGrade: 10, feedback: 'Good' } as never, 'standalone', null)).toEqual({
       score: '7',
       maxScore: '10',
       feedback: 'Good',
-      picks: {},
     });
     expect(gradingFormFor({ grade: 0, maxGrade: 5 } as never, 'standalone', null).score).toBe('0');
   });
@@ -119,10 +119,24 @@ describe('gradingFormFor', () => {
     expect(gradingFormFor(undefined, 'gradebook', null).maxScore).toBe('');
   });
 
-  it('starts a re-grade from the saved rubric scores, dropping any for criteria no longer in the grid', () => {
-    const criteria = [{ id: 'c1', name: 'Content', maxPoints: 4, levels: [{ label: 'Good', points: 4 }] }];
-    const saved = { grade: 4, maxGrade: 4, rubricScores: [{ criterionId: 'c1', points: 4, level: 'Good' }, { criterionId: 'gone', points: 1 }] };
-    expect(gradingFormFor(saved as never, 'standalone', null, criteria).picks).toEqual({ c1: { points: 4, level: 'Good' } });
+});
+
+describe('effectivePicks', () => {
+  const criteria = [{ id: 'c1', name: 'Content', maxPoints: 4, levels: [{ label: 'Good', points: 4 }] }];
+  const saved = { rubricScores: [{ criterionId: 'c1', points: 4, level: 'Good' }, { criterionId: 'gone', points: 1 }] };
+
+  it('shows the saved scores until the teacher picks, dropping any for criteria no longer in the grid', () => {
+    expect(effectivePicks(null, criteria, saved)).toEqual({ c1: { points: 4, level: 'Good' } });
+    expect(effectivePicks(null, criteria, undefined)).toEqual({});
+  });
+
+  it('shows them once the grid arrives, even if the dialog opened before it', () => {
+    expect(effectivePicks(null, [], saved)).toEqual({});
+    expect(effectivePicks(null, criteria, saved)).toEqual({ c1: { points: 4, level: 'Good' } });
+  });
+
+  it("uses the teacher's picks once there are any, even none", () => {
+    expect(effectivePicks({}, criteria, saved)).toEqual({});
   });
 });
 
@@ -134,7 +148,10 @@ describe('gradeToSave', () => {
 
   it('saves a plain grade when the rubric is not used', () => {
     expect(gradeToSave('7', '10', criteria, {})).toEqual({ score: 7, maxScore: 10, rubricScoring: null });
-    expect(gradeToSave('7', '10', [], {})).toEqual({ score: 7, maxScore: 10, rubricScoring: null });
+  });
+
+  it('leaves saved scores alone when no grid is shown (no rubric, a file-only one, or one not loaded yet)', () => {
+    expect(gradeToSave('7', '10', [], {})).toEqual({ score: 7, maxScore: 10, rubricScoring: undefined });
   });
 
   it('refuses a part-scored rubric, naming what is left', () => {

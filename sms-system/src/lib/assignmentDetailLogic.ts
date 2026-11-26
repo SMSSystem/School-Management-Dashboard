@@ -114,18 +114,12 @@ export function buildRoster(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * What the Grade dialog starts with: the saved grade, feedback and rubric scores if there are any; in gradebook mode
- * the column's max score.
- */
+/** What the Grade dialog starts with: the saved grade and feedback if there are any; in gradebook mode the column's max score. */
 export function gradingFormFor(
-  submission:
-    | Pick<Submission, "grade" | "maxGrade" | "feedback" | "rubricScores">
-    | undefined,
+  submission: Pick<Submission, "grade" | "maxGrade" | "feedback"> | undefined,
   gradingMode: Assignment["gradingMode"] | undefined,
   gradebookColumnMaxScore: number | null,
-  criteria: RubricCriterion[] = [],
-): { score: string; maxScore: string; feedback: string; picks: RubricPicks } {
+): { score: string; maxScore: string; feedback: string } {
   return {
     score: submission?.grade !== undefined ? String(submission.grade) : "",
     maxScore:
@@ -135,8 +129,19 @@ export function gradingFormFor(
           ? String(submission.maxGrade)
           : "",
     feedback: submission?.feedback ?? "",
-    picks: picksFromSaved(criteria, submission?.rubricScores),
   };
+}
+
+/**
+ * The Grade dialog's rubric picks: the teacher's, once they pick, or else the saved scores. Worked out from the grid
+ * each time, not when the dialog opens, so saved scores show even when the grid arrives after it opened.
+ */
+export function effectivePicks(
+  picks: RubricPicks | null,
+  criteria: RubricCriterion[],
+  submission: Pick<Submission, "rubricScores"> | undefined,
+): RubricPicks {
+  return picks ?? picksFromSaved(criteria, submission?.rubricScores);
 }
 
 /** The Grade dialog's two checks: the message to show, or the numbers to save. */
@@ -157,7 +162,8 @@ export function validateGrade(
 
 /**
  * Save Grade's checks with the rubric: a part-scored rubric is refused, a fully scored one is saved with the grade,
- * and an unused one saves a plain grade.
+ * and an unused one saves a plain grade, removing any saved scores. With no grid shown (no rubric, a file-only one,
+ * or one not loaded yet) `rubricScoring` is undefined, so saved scores are left as they are.
  */
 export function gradeToSave(
   scoreText: string,
@@ -166,11 +172,16 @@ export function gradeToSave(
   picks: RubricPicks,
 ):
   | { error: string }
-  | { score: number; maxScore: number; rubricScoring: RubricScoring | null } {
+  | {
+      score: number;
+      maxScore: number;
+      rubricScoring: RubricScoring | null | undefined;
+    } {
   const state = scoreState(criteria, picks);
   if (state.kind === "partial") return { error: partialScoreError(state.missing) };
   const checked = validateGrade(scoreText, maxScoreText);
   if ("error" in checked) return checked;
+  if (criteria.length === 0) return { ...checked, rubricScoring: undefined };
   const rubricScoring =
     state.kind === "complete"
       ? {
