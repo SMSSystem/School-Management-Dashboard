@@ -1,10 +1,22 @@
-// The offline idle lock screen's wording (components/IdleLockScreen.tsx, slice D). Kept apart so it can be tested
-// and read in one place.
+// The offline lock's wording (components/IdleLockScreen.tsx and components/LockButton.tsx, slice D). Kept apart so it
+// can be tested and read in one place. The first line says why the screen locked (lib/offline/idleLock.ts
+// IdleLockReason); add a case there and here together.
+
+import type { IdleLockReason } from "./idleLock";
 
 export const lockScreenText = {
   title: "Locked",
-  intro:
-    "You were away while offline, so the screen locked. Enter your password to carry on.",
+  intro: (reason: IdleLockReason) =>
+    reason === "manual"
+      ? "You locked the screen. Enter your password to carry on."
+      : "You were away while offline, so the screen locked. Enter your password to carry on.",
+  /** The countdown before an idle timeout: staff who work offline lock while offline, everyone else signs out. */
+  idleWarning: (secondsLeft: number, action: "lock" | "sign-out") =>
+    action === "lock"
+      ? `The screen will lock in ${secondsLeft}s due to inactivity.`
+      : `You'll be signed out in ${secondsLeft}s due to inactivity.`,
+  lockButton: "Lock",
+  lockButtonLabel: "Lock the screen",
   unlock: "Unlock",
   checking: "Checking…",
   signingOut: "Signing out…",

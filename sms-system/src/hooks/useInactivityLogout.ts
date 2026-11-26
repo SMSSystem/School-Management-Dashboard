@@ -5,12 +5,12 @@ import { useToast } from '@/lib/ToastContext';
 import { inactivityTimeoutMs } from '@/lib/inactivityTimeout';
 import { inactivityState } from '@/lib/inactivityClock';
 import { onActivity } from '@/lib/activityBus';
-import { getConnectionState } from '@/lib/connectionStatus';
+import { deviceOnline } from '@/lib/connectionStatus';
 import { idleAction, idleLockState, lockTab, subscribeIdleLock } from '@/lib/offline/idleLock';
+import { lockScreenText } from '@/lib/offline/idleLockText';
 
-/** Offline as the connection banner sees it: the browser says so, or the app couldn't reach its servers. */
-const deviceOffline = () =>
-  (typeof navigator !== 'undefined' && navigator.onLine === false) || getConnectionState().offline;
+/** Offline as the connection banner sees it (lib/connectionStatus.ts deviceOnline): decides lock versus sign-out. */
+const deviceOffline = () => !deviceOnline();
 
 const TICK_MS = 1000;
 // Things the person does. Mouse and keyboard events inside an iframe (a PDF viewer) never reach the page;
@@ -23,8 +23,6 @@ const ACTIVITY_OPTIONS = { passive: true, capture: true } as const;
 // are throttled and a sleeping laptop's stop, so the tick may not have run for a long time.
 const WAKE_EVENTS = ['focus', 'pageshow'] as const;
 
-const warningMessage = (secondsLeft: number) =>
-  `You'll be signed out in ${secondsLeft}s due to inactivity.`;
 
 export function useInactivityLogout(): void {
   const { user, role, signOut } = useAuth();
@@ -65,7 +63,8 @@ export function useInactivityLogout(): void {
         signingOut = true;
         clearWarning();
         // Staff who work offline lock instead while the device is offline (slice D): a sign-out then would delete the
-        // device's drafts and reload to a sign-in page that can't load. The lock screen replaces the page.
+        // device's drafts and leave a sign-in page that can't sign anyone in until the connection returns. The lock
+        // screen replaces the page.
         const uid = latest.current.uid;
         if (uid && idleAction({ role, offline: deviceOffline() }) === 'lock') {
           lockTab(uid);
@@ -82,11 +81,13 @@ export function useInactivityLogout(): void {
         return;
       }
       if (state === 'warning') {
+        // Says what will happen: lock or sign out, as decided at expiry (the connection can change meanwhile).
+        const message = lockScreenText.idleWarning(secondsLeft, idleAction({ role, offline: deviceOffline() }));
         if (warningToastId) {
-          latest.current.updateToast(warningToastId, { message: warningMessage(secondsLeft) });
+          latest.current.updateToast(warningToastId, { message });
         } else {
           warningToastId = latest.current.showToast({
-            message: warningMessage(secondsLeft),
+            message,
             variant: 'warning',
             // no durationMs — sticky; cleared by markActive() (on activity) or by the sign-out itself
           });

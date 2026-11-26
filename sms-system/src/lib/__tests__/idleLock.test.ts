@@ -9,6 +9,8 @@ import {
   idleLockState,
   lockTab,
   lockedTooLongOnline,
+  lockReason,
+  manualLockAllowed,
   markOffline,
   markOnline,
   recordFailure,
@@ -80,7 +82,7 @@ describe("the lock state", () => {
   it("locks, counts wrong passwords, and unlocks", () => {
     expect(idleLockState()).toBeNull();
     lockTab("t1");
-    expect(idleLockState()).toEqual({ uid: "t1", failures: 0 });
+    expect(idleLockState()).toEqual({ uid: "t1", failures: 0, reason: "idle" });
     expect(recordFailure()).toBe(1);
     expect(recordFailure()).toBe(2);
     unlockTab();
@@ -92,7 +94,7 @@ describe("the lock state", () => {
     lockTab("t1");
     recordFailure();
     resetIdleLockCacheForTests();
-    expect(idleLockState()).toEqual({ uid: "t1", failures: 1 });
+    expect(idleLockState()).toEqual({ uid: "t1", failures: 1, reason: "idle" });
   });
 
   it("tells listeners about every change, and allows five tries", () => {
@@ -123,6 +125,7 @@ describe("a locked tab that is back online", () => {
     expect(idleLockState()).toEqual({
       uid: "t1",
       failures: 0,
+      reason: "idle",
       onlineSince: 1000,
     });
     recordFailure();
@@ -130,20 +133,26 @@ describe("a locked tab that is back online", () => {
     expect(idleLockState()).toEqual({
       uid: "t1",
       failures: 1,
+      reason: "idle",
       onlineSince: 1000,
     });
     markOffline();
-    expect(idleLockState()).toEqual({ uid: "t1", failures: 1 });
+    expect(idleLockState()).toEqual({ uid: "t1", failures: 1, reason: "idle" });
   });
 
   it("signs out after thirty minutes online, and never while offline", () => {
     expect(LOCKED_ONLINE_LIMIT_MS).toBe(30 * 60 * 1000);
-    const online = { uid: "t1", failures: 0, onlineSince: 0 };
+    const online = {
+      uid: "t1",
+      failures: 0,
+      reason: "idle" as const,
+      onlineSince: 0,
+    };
     expect(lockedTooLongOnline(online, LOCKED_ONLINE_LIMIT_MS - 1)).toBe(false);
     expect(lockedTooLongOnline(online, LOCKED_ONLINE_LIMIT_MS)).toBe(true);
     expect(
       lockedTooLongOnline(
-        { uid: "t1", failures: 0 },
+        { uid: "t1", failures: 0, reason: "idle" },
         10 * LOCKED_ONLINE_LIMIT_MS,
       ),
     ).toBe(false);
@@ -155,7 +164,7 @@ describe("a locked tab that is back online", () => {
       IDLE_LOCK_STORAGE,
       JSON.stringify({ uid: "t1", failures: 0, onlineSince: "soon" }),
     );
-    expect(idleLockState()).toEqual({ uid: "t1", failures: 0 });
+    expect(idleLockState()).toEqual({ uid: "t1", failures: 0, reason: "idle" });
   });
 });
 
@@ -210,5 +219,70 @@ describe("the password verifier", () => {
       JSON.stringify({ v: 1, uid: "t1", salt: "x", hash: "y", iterations: 0 }),
     );
     expect(await checkPassword("t1", "pw")).toBe("none");
+  });
+});
+
+describe("why the tab locked", () => {
+  it("reads as idle when the tab isn't locked", () => {
+    expect(lockReason()).toBe("idle");
+  });
+
+  it("keeps the reason across a reload, a wrong password and going offline again", () => {
+    lockTab("t1", "manual");
+    recordFailure();
+    markOnline(1000);
+    resetIdleLockCacheForTests();
+    expect(idleLockState()).toMatchObject({ reason: "manual", failures: 1 });
+    expect(lockReason()).toBe("manual");
+    markOffline();
+    expect(idleLockState()).toEqual({
+      uid: "t1",
+      failures: 1,
+      reason: "manual",
+    });
+  });
+
+  it("reads a lock written before the Lock button, or with a damaged reason, as an idle lock", () => {
+    storage.setItem(
+      IDLE_LOCK_STORAGE,
+      JSON.stringify({ uid: "t1", failures: 0 }),
+    );
+    expect(idleLockState()?.reason).toBe("idle");
+    resetIdleLockCacheForTests();
+    storage.setItem(
+      IDLE_LOCK_STORAGE,
+      JSON.stringify({ uid: "t1", failures: 0, reason: "nap" }),
+    );
+    expect(idleLockState()?.reason).toBe("idle");
+  });
+});
+
+describe("manualLockAllowed", () => {
+  const ok = {
+    role: "regular_teacher",
+    online: false,
+    hasVerifier: true,
+  } as const;
+
+  it("offers Lock offline, to staff who work offline, on a tab that can unlock offline", () => {
+    for (const role of [
+      "regular_teacher",
+      "senior_teacher",
+      "institution_admin",
+    ] as const)
+      expect(manualLockAllowed({ ...ok, role })).toBe(true);
+  });
+
+  it("never online, never to other roles, and never without a verifier", () => {
+    expect(manualLockAllowed({ ...ok, online: true })).toBe(false);
+    for (const role of [
+      "student",
+      "parent",
+      "spectator",
+      "super_admin",
+      null,
+    ] as const)
+      expect(manualLockAllowed({ ...ok, role })).toBe(false);
+    expect(manualLockAllowed({ ...ok, hasVerifier: false })).toBe(false);
   });
 });
