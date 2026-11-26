@@ -14,6 +14,7 @@ export function AssignmentScopeFields({
   teacherOptions,
   isTeacherRole,
   lockedTeacherName,
+  values,
 }: {
   register: UseFormRegister<AssignmentFormValues>;
   errors: FieldErrors<AssignmentFormValues>;
@@ -24,6 +25,7 @@ export function AssignmentScopeFields({
   teacherOptions: { id: string; name: string }[];
   isTeacherRole: boolean;
   lockedTeacherName: string;
+  values: Partial<Record<"termId" | "subjectId" | "classId" | "teacherId", string | undefined>>;
 }) {
   return (
     <>
@@ -44,6 +46,7 @@ export function AssignmentScopeFields({
       teacherOptions={teacherOptions}
       isTeacherRole={isTeacherRole}
       lockedTeacherName={lockedTeacherName}
+      values={values}
     />
 
     <InputField

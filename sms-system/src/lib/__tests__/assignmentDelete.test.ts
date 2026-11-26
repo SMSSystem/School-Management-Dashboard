@@ -103,3 +103,12 @@ describe("the delete path and the dialog", () => {
     );
   });
 });
+
+describe("the frozen rubric grid", () => {
+  it("is deleted with the assignment's other documents, before the assignment", () => {
+    const body = cascade.slice(cascade.indexOf("export async function deleteAssignmentCascade"));
+    const frozen = body.indexOf('"rubric",');
+    expect(frozen).toBeGreaterThan(-1);
+    expect(frozen).toBeLessThan(body.indexOf("for (const group of chunkOperations(refs))"));
+  });
+});

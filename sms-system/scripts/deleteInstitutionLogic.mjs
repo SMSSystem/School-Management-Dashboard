@@ -47,7 +47,7 @@ export const INSTITUTION_TREE = {
     grades: {},
     accommodations: {},
   },
-  assignments: { submissions: { attempts: {} }, submissionTombstones: {} },
+  assignments: { submissions: { attempts: {} }, submissionTombstones: {}, rubric: {} },
   rubrics: { file: {} },
   results: {},
   feedback_comments: {},

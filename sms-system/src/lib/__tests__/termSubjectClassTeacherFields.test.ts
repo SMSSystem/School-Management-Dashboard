@@ -83,3 +83,19 @@ describe('the two forms', () => {
     expect(at('<TermSubjectClassTeacherFields')).toBeLessThan(at('label="Due Date"'));
   });
 });
+
+describe('the values an edit opens with', () => {
+  // react-hook-form sets a select's value once, when it registers; an option list that arrived later left Subject and
+  // Class showing their placeholders on an edit. Given the form's values, each select shows its own.
+  it('shows each value the form passes', () => {
+    const out = html({ values: { termId: 't1', subjectId: 's1', classId: 'c1', teacherId: 'u1' } });
+    for (const option of ['<option value="t1" selected="">', '<option value="s1" selected="">', '<option value="c1" selected="">', '<option value="u1" selected="">']) {
+      expect(out).toContain(option);
+    }
+  });
+
+  it('is passed by both forms', () => {
+    expect(lf(examFormRaw)).toContain('values={{ termId: watch("termId"), subjectId: watchedSubjectId, classId: watchedClassId, teacherId: watch("teacherId") }}');
+    expect(lf(scopeFieldsRaw)).toContain('values={values}');
+  });
+});

@@ -29,7 +29,7 @@ const RubricReview = lazy(() => import("@/components/rubric/RubricReview"));
 type Rubric = RubricDocument & { id: string };
 
 const SHARED_WARNING =
-  "This changes the file for every assignment using this rubric, including any already graded.";
+  "This changes the file for every assignment using this rubric that hasn't been graded yet.";
 const SAVE_FAILED = "The change could not be saved. Please try again.";
 const ICON_BTN_CLS =
   "flex h-7 w-7 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-40";

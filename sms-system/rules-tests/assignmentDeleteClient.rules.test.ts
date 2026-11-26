@@ -78,6 +78,13 @@ async function seedAssignment(): Promise<void> {
     studentId: "studentA",
     score: 8,
   });
+  // The rubric's grid frozen at the first grade (src/lib/rubricFreeze.ts).
+  await seedDoc(sub("rubric/frozen"), {
+    rubricId: "rub1",
+    title: "Essay rubric",
+    criteria: [{ id: "c1", name: "Content", maxPoints: 4, levels: [] }],
+    frozenAt: now,
+  });
 }
 
 // The same references assignmentDelete.ts builds.
@@ -89,6 +96,7 @@ const cascadeRefs = (uid: string) => [
   doc(as(uid), sub("submissions/studentA2")),
   doc(as(uid), sub("submissionTombstones/studentA")),
   doc(as(uid), sub("submissionTombstones/studentA2")),
+  doc(as(uid), sub("rubric/frozen")),
 ];
 
 const audit = (uid: string) =>

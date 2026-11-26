@@ -4,6 +4,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import { institutionDoc, institutionSubdoc } from "@/lib/paths";
 import { assignmentGradebookId, type Assignment, type Rubric } from "@/lib/assignmentDetailLogic";
+import { rubricFromFrozen } from "@/lib/rubricFreeze";
+import type { FrozenRubric } from "@/types/assessment";
 
 // What the assignment detail page (scenes/(dashboard)/list/assignments/[id]) reads about the assignment itself:
 // the document, its rubric, and the max score of the gradebook column it is linked to. Moved from the page as
@@ -46,17 +48,28 @@ export function useAssignmentRecord(id: string | undefined) {
     );
   }, [id, institutionId]);
 
+  // Once grading started, the assignment keeps its own copy of the rubric's grid in rubric/frozen (rubricFreeze.ts):
+  // that one document is read instead of the shared rubric, so the read count is the same.
+  const frozen = Boolean(assignment?.rubricFrozenAt);
+
   useEffect(() => {
     if (!institutionId || institutionId === "*" || !assignment?.rubricId) {
       setRubric(null);
       return;
+    }
+    if (frozen) {
+      return onSnapshot(
+        institutionSubdoc(institutionId, "assignments", assignment.id, "rubric", "frozen"),
+        (snap) => setRubric(snap.exists() ? rubricFromFrozen(snap.data() as FrozenRubric, institutionId) : null),
+        () => setRubric(null),
+      );
     }
     return onSnapshot(
       institutionDoc(institutionId, "rubrics", assignment.rubricId),
       (snap) => setRubric(snap.exists() ? ({ id: snap.id, ...snap.data() } as Rubric) : null),
       () => setRubric(null),
     );
-  }, [institutionId, assignment?.rubricId]);
+  }, [institutionId, assignment?.id, assignment?.rubricId, frozen]);
 
   useEffect(() => {
     if (

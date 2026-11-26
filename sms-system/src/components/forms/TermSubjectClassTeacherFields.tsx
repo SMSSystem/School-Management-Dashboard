@@ -3,6 +3,13 @@ import { LABEL_CLS, SELECT_CLS } from "./assignment/styles";
 import { ROOMY_FIELD_CLS, ROOMY_INPUT_CLS, ROOMY_LABEL_CLS, type FieldVariant } from "./exam/examFormStyles";
 
 type Named = { id: string; name: string };
+type ScopeValues = Partial<Record<"termId" | "subjectId" | "classId" | "teacherId", string | undefined>>;
+
+// A select's value from the form's values: controlled only when the form passes them (both forms do), and left to
+// react-hook-form otherwise.
+function shown(values: ScopeValues | undefined, name: keyof ScopeValues): { value?: string } {
+  return values ? { value: values[name] ?? "" } : {};
+}
 
 const BOX_CLS = "flex flex-col gap-2 w-full md:w-1/4";
 
@@ -21,6 +28,11 @@ type Props<T extends FieldValues> = {
   lockedTeacherName: string;
   /** "roomy" is the look of the Edit Student Details form (the exam form); the default is the assignment form's. */
   variant?: FieldVariant;
+  /**
+   * The form's current values (its watch()). Each select shows its value from these, so a value set before its option
+   * list loaded still shows once the list arrives; react-hook-form alone sets a select only once, when it registers.
+   */
+  values?: ScopeValues;
 };
 
 // The Term, Subject, Class and Teacher fields that the Add/Edit Exam form and the Add/Edit Assignment form share.
@@ -38,6 +50,7 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
   isTeacherRole,
   lockedTeacherName,
   variant = "default",
+  values,
 }: Props<T>) {
   const roomy = variant === "roomy";
   const box = roomy ? ROOMY_FIELD_CLS : BOX_CLS;
@@ -51,7 +64,7 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
     <>
       <div className={box}>
         <label htmlFor={roomy ? "termId" : undefined} className={label}>Term</label>
-        <select id={roomy ? "termId" : undefined} className={select} {...register("termId" as Path<T>)}>
+        <select id={roomy ? "termId" : undefined} className={select} {...register("termId" as Path<T>)} {...shown(values, "termId")}>
           <option value="">Select a term</option>
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
@@ -68,6 +81,7 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
           id={roomy ? "subjectId" : undefined}
           className={select}
           {...register("subjectId" as Path<T>)}
+          {...shown(values, "subjectId")}
           onChange={(e) => {
             set("subjectId", e.target.value);
             set("classId", "");
@@ -86,7 +100,7 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
 
       <div className={box}>
         <label htmlFor={roomy ? "classId" : undefined} className={label}>Class</label>
-        <select id={roomy ? "classId" : undefined} className={select} {...register("classId" as Path<T>)}>
+        <select id={roomy ? "classId" : undefined} className={select} {...register("classId" as Path<T>)} {...shown(values, "classId")}>
           <option value="">Select a class</option>
           {classOptions.map((c) => (
             <option key={c.id} value={c.id}>
@@ -108,7 +122,7 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
             className={roomy ? ROOMY_INPUT_CLS : "ring-[1.5px] ring-gray-200 p-2 rounded-md text-sm w-full bg-gray-100 text-gray-500 dark:ring-gray-700 dark:bg-gray-800 dark:text-gray-400"}
           />
         ) : (
-          <select id={roomy ? "teacherId" : undefined} className={select} {...register("teacherId" as Path<T>)}>
+          <select id={roomy ? "teacherId" : undefined} className={select} {...register("teacherId" as Path<T>)} {...shown(values, "teacherId")}>
             <option value="">Select a teacher</option>
             {teacherOptions.map((t) => (
               <option key={t.id} value={t.id}>
