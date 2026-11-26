@@ -16,9 +16,9 @@ export const RUBRIC_FILE_CONFIRMATION =
 /** What a teacher confirms before a grid read from a file is saved. The file itself isn't kept (D16), but the grid is shown. */
 export const RUBRIC_GRID_CONFIRMATION =
   "This grid holds no student names, marks or answer keys. Students and parents will see it.";
-/** Shown wherever a rubric's grid is changed: a rubric is shared, and has no versions (RUBRICS_UPLOAD_SPEC.md section 13.3). */
+/** Shown wherever a rubric's grid is changed: a rubric is shared, and only graded work keeps its own grid (RUBRICS_UPLOAD_SPEC.md section 6.13). */
 export const GRID_SHARED_WARNING =
-  "This changes the grid for every assignment using this rubric, including any already graded.";
+  "This changes the grid for every assignment using this rubric that hasn't been graded yet; graded ones keep theirs.";
 /** A limit in the UI only, counted from the list already in memory: the rules cannot count documents. */
 export const SOFT_SCHOOL_FILE_LIMIT = 200;
 

@@ -55,7 +55,7 @@ export default function RubricReview({
       {replacesGrid && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
           Saving replaces this rubric's current grid, on every assignment using
-          it.
+          it that hasn't been graded yet.
         </p>
       )}
       {warnings.map((warning) => (

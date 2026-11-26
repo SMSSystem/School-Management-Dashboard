@@ -12,7 +12,7 @@ const norm = (s: string) => s.replace(/\s+/g, " ");
 describe("the shared-rubric warning on grid edits", () => {
   it("is one sentence, shared by the file actions and the Edit form", () => {
     expect(GRID_SHARED_WARNING).toBe(
-      "This changes the grid for every assignment using this rubric, including any already graded.",
+      "This changes the grid for every assignment using this rubric that hasn't been graded yet; graded ones keep theirs.",
     );
     expect(actionsRaw).toContain("GRID_SHARED_WARNING");
     expect(actionsRaw).not.toMatch(/const GRID_SHARED_WARNING/);
