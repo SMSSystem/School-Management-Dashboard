@@ -304,6 +304,18 @@ When the template's layout doesn't fit a table, three more are tried, in `rubric
 - **Deleting a rubric in use** is still allowed. Graded assignments keep their frozen grid; others show it as missing, as before.
 - **Not built:** versions of a rubric. Freezing answers section 13.3 for graded work without them.
 
+### 6.14 Scoring with a rubric, as built
+
+- **In the Grade dialog.** When the assignment's rubric has a grid, the dialog lists each criterion with a button per level, or a points box for a criterion with no levels (D20), and a running total (`RubricScorePicker.tsx`, pure logic in `src/lib/rubricScoring.ts`). Each pick fills Score and Max Score: the total out of the rubric's max, or in gradebook mode the total scaled to the column, to one decimal place (15 of 20 on a column out of 100 is 75), with the column's max kept.
+- **Optional, but all or nothing.** With nothing picked, the grade saves as before, with no rubric scores. Once any criterion is scored, every one must be before Save Grade works, and the dialog names those left. **Clear rubric scores** empties the picks.
+- **Score can still be changed.** A note says when Score differs from the rubric total; the rubric scores are saved as picked either way.
+- **Level points over the max.** The rubric form doesn't stop a level from carrying more points than its criterion's max, so scoring caps it at the max and the level's button says so.
+- **What is saved.** On the submission, with the grade: `rubricScores` (one `{criterionId, points, level?}` per criterion, in the grid's order), `rubricTotal` and `rubricMax`, on the rubric's own scale. Scores name the frozen grid's criteria: the first grade freezes the grid in the same batch (section 6.13). A re-grade starts from the saved picks, and a re-grade without them removes them. Cleared feedback is now removed too, instead of keeping the old text.
+- **Offline.** Save Grade is disabled while offline, with a note; the picks stay in the dialog until it is back.
+- **Who sees the scores.** Students and parents see the total and the awarded level of each criterion inside the folded Rubric section, once the work is graded. Staff see them only in the Grade dialog. Converting an assignment to the gradebook (Assignments §4.5) rescales the grade, not the rubric scores, which stay on the rubric's scale.
+- **Rules.** The grader's update of a submission may also change the three fields, which must be all present or all absent, with 1 to 50 scores and a total from 0 to the max (`validRubricScores`). Each score's shape isn't checked: only graders write them, and the page ignores a score whose criterion isn't in the grid. The student's own update can't touch them. Tested in `rules-tests/assignmentRubricScores.rules.test.ts`.
+- **Cost.** No extra reads or documents: the scores ride on the grade's existing submission write, about 50 bytes per criterion, and the page already reads the submission and the grid.
+
 ### 6.7 Cost and tradeoff
 
 - **Cost:** no Firebase reads or writes, and no rules. Both places already hold the rubric in memory.
@@ -868,7 +880,7 @@ e2e specs use the production Firebase project's quota, so run only those named h
 
 | Feature                                    | Note                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| **Scoring against criteria while grading** | The most valuable next step, and it's what makes the grid worth having. A separate design. |
+| Scoring against criteria while grading     | Built (section 6.14).                                                                      |
 | Rubric versions                            | Mostly answered by freezing the grid at the first grade (section 6.13); full versions not planned. |
 | Bulk upload                                | Each file needs a review, so the flow is different.                                        |
 | In-app preview                             | Adds rendering risk (section 13.1).                                                        |

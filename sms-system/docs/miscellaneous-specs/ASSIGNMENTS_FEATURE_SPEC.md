@@ -225,6 +225,8 @@ export type SubmissionTombstoneDocument = {
 
 ### 4.3 Grading write shape
 
+**Since the rubric scoring work (RUBRICS_UPLOAD_SPEC.md section 6.14):** the submission's grade fields also carry `rubricScores`, `rubricTotal` and `rubricMax` when the grade was scored with the assignment's rubric, and a re-grade without them removes them with `deleteField()`. `feedback` is written when it isn't empty and removed otherwise, so clearing it on a re-grade no longer keeps the old text. The `results` writes below are unchanged.
+
 **Correction from the initial draft**: "standalone" previously meant only writing grade fields onto `SubmissionDocument`, with no `ResultDocument` at all. That silently narrowed what was actually agreed during the brainstorm that preceded this spec — "standalone" was defined there as _"a standalone `ResultDocument`... visible in the Results list and counted toward report cards,"_ explicitly distinguished from "doesn't appear in the Gradebook grid," not from "doesn't exist anywhere outside the submission." Fixed below.
 
 **`gradingMode: 'standalone'`** — grade/feedback fields written onto `SubmissionDocument` (§4.2), **plus** a plain `results` write:
