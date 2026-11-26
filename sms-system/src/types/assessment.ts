@@ -189,6 +189,12 @@ export type SubmissionDocument = {
   gradedBy?: string;
   gradedByName?: string;
   gradedAt?: Timestamp;
+  // Set when the grade was scored with the rubric (src/lib/rubricScoring.ts), all three together: one score per
+  // criterion of the assignment's frozen grid, their total and the rubric's max, on the rubric's own scale (the
+  // grade above may be scaled to a gradebook column, or changed by the teacher). Removed by a re-grade without them.
+  rubricScores?: RubricScore[];
+  rubricTotal?: number;
+  rubricMax?: number;
 
   // Retention (§9) — denormalized from the parent assignment's dueDate at
   // write time. Normally identical across every submission/attempt under
@@ -251,6 +257,13 @@ export type RubricCriterion = {
   name: string;
   maxPoints: number;
   levels: RubricLevel[];
+};
+
+/** One criterion's score on a graded submission: the points, and the level picked (absent for typed points). */
+export type RubricScore = {
+  criterionId: string;
+  points: number;
+  level?: string;
 };
 
 // The summary of a rubric's uploaded file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 4). The file's body is never

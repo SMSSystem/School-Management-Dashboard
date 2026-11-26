@@ -1,5 +1,6 @@
 import type {
   AssignmentDocument,
+  RubricCriterion,
   RubricDocument,
   SubmissionDocument,
 } from "@/types/assessment";
@@ -7,6 +8,16 @@ import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/types/assessment";
 import type { Role } from "@/types/people";
 import { hasStaffView } from "@/lib/roleCapabilities";
 import { readClassSubjects, takesSubject } from "@/lib/studentClasses";
+import {
+  partialScoreError,
+  picksFromSaved,
+  rubricMax,
+  scoresToSave,
+  scoreState,
+  scoreTotal,
+  type RubricPicks,
+  type RubricScoring,
+} from "@/lib/rubricScoring";
 
 // The assignment detail page's rules that need no screen or database (scenes/(dashboard)/list/assignments/[id]):
 // who may edit and who may see the roster, the row types and badge text, the assignment's type and due date as
@@ -103,12 +114,18 @@ export function buildRoster(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** What the Grade dialog starts with: the saved grade and feedback if there are any; in gradebook mode the column's max score. */
+/**
+ * What the Grade dialog starts with: the saved grade, feedback and rubric scores if there are any; in gradebook mode
+ * the column's max score.
+ */
 export function gradingFormFor(
-  submission: Pick<Submission, "grade" | "maxGrade" | "feedback"> | undefined,
+  submission:
+    | Pick<Submission, "grade" | "maxGrade" | "feedback" | "rubricScores">
+    | undefined,
   gradingMode: Assignment["gradingMode"] | undefined,
   gradebookColumnMaxScore: number | null,
-): { score: string; maxScore: string; feedback: string } {
+  criteria: RubricCriterion[] = [],
+): { score: string; maxScore: string; feedback: string; picks: RubricPicks } {
   return {
     score: submission?.grade !== undefined ? String(submission.grade) : "",
     maxScore:
@@ -118,6 +135,7 @@ export function gradingFormFor(
           ? String(submission.maxGrade)
           : "",
     feedback: submission?.feedback ?? "",
+    picks: picksFromSaved(criteria, submission?.rubricScores),
   };
 }
 
@@ -135,6 +153,33 @@ export function validateGrade(
     return { error: "Score cannot exceed the max score." };
   }
   return { score, maxScore };
+}
+
+/**
+ * Save Grade's checks with the rubric: a part-scored rubric is refused, a fully scored one is saved with the grade,
+ * and an unused one saves a plain grade.
+ */
+export function gradeToSave(
+  scoreText: string,
+  maxScoreText: string,
+  criteria: RubricCriterion[],
+  picks: RubricPicks,
+):
+  | { error: string }
+  | { score: number; maxScore: number; rubricScoring: RubricScoring | null } {
+  const state = scoreState(criteria, picks);
+  if (state.kind === "partial") return { error: partialScoreError(state.missing) };
+  const checked = validateGrade(scoreText, maxScoreText);
+  if ("error" in checked) return checked;
+  const rubricScoring =
+    state.kind === "complete"
+      ? {
+          scores: scoresToSave(criteria, picks),
+          total: scoreTotal(criteria, picks),
+          max: rubricMax(criteria),
+        }
+      : null;
+  return { ...checked, rubricScoring };
 }
 
 /** The gradebook's columns as the Convert dialog lists them: untitled and zero-score defaults, in column order. */

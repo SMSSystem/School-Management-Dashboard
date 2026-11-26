@@ -9,6 +9,7 @@ import {
   canViewRoster,
   conversionColumnsOf,
   formatDueDate,
+  gradeToSave,
   gradingFormFor,
   validateGrade,
 } from '../assignmentDetailLogic';
@@ -103,11 +104,12 @@ describe('buildRoster', () => {
 
 describe('gradingFormFor', () => {
   it('starts empty for an ungraded submission, and with the saved grade, maximum and feedback for a graded one', () => {
-    expect(gradingFormFor(undefined, 'standalone', null)).toEqual({ score: '', maxScore: '', feedback: '' });
+    expect(gradingFormFor(undefined, 'standalone', null)).toEqual({ score: '', maxScore: '', feedback: '', picks: {} });
     expect(gradingFormFor({ grade: 7, maxGrade: 10, feedback: 'Good' } as never, 'standalone', null)).toEqual({
       score: '7',
       maxScore: '10',
       feedback: 'Good',
+      picks: {},
     });
     expect(gradingFormFor({ grade: 0, maxGrade: 5 } as never, 'standalone', null).score).toBe('0');
   });
@@ -115,6 +117,48 @@ describe('gradingFormFor', () => {
   it('takes the maximum from the linked gradebook column in gradebook mode, whatever the submission says', () => {
     expect(gradingFormFor({ grade: 7, maxGrade: 10 } as never, 'gradebook', 50).maxScore).toBe('50');
     expect(gradingFormFor(undefined, 'gradebook', null).maxScore).toBe('');
+  });
+
+  it('starts a re-grade from the saved rubric scores, dropping any for criteria no longer in the grid', () => {
+    const criteria = [{ id: 'c1', name: 'Content', maxPoints: 4, levels: [{ label: 'Good', points: 4 }] }];
+    const saved = { grade: 4, maxGrade: 4, rubricScores: [{ criterionId: 'c1', points: 4, level: 'Good' }, { criterionId: 'gone', points: 1 }] };
+    expect(gradingFormFor(saved as never, 'standalone', null, criteria).picks).toEqual({ c1: { points: 4, level: 'Good' } });
+  });
+});
+
+describe('gradeToSave', () => {
+  const criteria = [
+    { id: 'c1', name: 'Content', maxPoints: 4, levels: [{ label: 'Good', points: 4 }] },
+    { id: 'c2', name: 'Style', maxPoints: 6, levels: [] },
+  ];
+
+  it('saves a plain grade when the rubric is not used', () => {
+    expect(gradeToSave('7', '10', criteria, {})).toEqual({ score: 7, maxScore: 10, rubricScoring: null });
+    expect(gradeToSave('7', '10', [], {})).toEqual({ score: 7, maxScore: 10, rubricScoring: null });
+  });
+
+  it('refuses a part-scored rubric, naming what is left', () => {
+    expect(gradeToSave('4', '10', criteria, { c1: { points: 4, level: 'Good' } })).toEqual({
+      error: 'Score every rubric criterion, or clear the rubric scores. Still to score: Style.',
+    });
+  });
+
+  it('saves the scores, total and max with a fully scored rubric, even when the score was changed', () => {
+    const picks = { c1: { points: 4, level: 'Good' }, c2: { points: 4.5 } };
+    expect(gradeToSave('9', '10', criteria, picks)).toEqual({
+      score: 9,
+      maxScore: 10,
+      rubricScoring: {
+        scores: [{ criterionId: 'c1', points: 4, level: 'Good' }, { criterionId: 'c2', points: 4.5 }],
+        total: 8.5,
+        max: 10,
+      },
+    });
+  });
+
+  it('still runs the score checks', () => {
+    const picks = { c1: { points: 4, level: 'Good' }, c2: { points: 6 } };
+    expect(gradeToSave('11', '10', criteria, picks)).toEqual({ error: 'Score cannot exceed the max score.' });
   });
 });
 
