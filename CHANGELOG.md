@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.60.0"></a>
 <details open>
-<summary><strong>v2.60.0</strong> · 2026-11-26 · Scoring with Rubrics</summary>
+<summary><strong>v2.60.0</strong> · 2026-11-26 · Scoring with Rubrics (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/123">#123</a>)</summary>
 
 - **Added:** teachers can grade with an assignment's rubric: pick a level for each criterion in the Grade dialog, and the score fills in from the total (scaled to the column in a gradebook assignment). The score can still be changed, and using the rubric is optional.
 - **Added:** students and parents see the rubric score and the level awarded for each criterion in the assignment's Rubric section, once the work is graded.
