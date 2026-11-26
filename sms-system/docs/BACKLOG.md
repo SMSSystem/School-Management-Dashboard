@@ -37,6 +37,12 @@ Move an entry out when the work starts or the owner drops it. Keep school data o
 - **Why it waits:** most are expected to be deliberate, so the review is unlikely to find much, and each one needs a judgement.
 - **Starts when:** the periodic review has time, or the number grows noticeably.
 
+### Remove the glob override for workbox-build
+
+- **What:** `package.json` `overrides` pins `glob` to 14.0.5 under `workbox-build` (added with slice E). `workbox-build` 7.4.1 asks for `glob` ^11, which has a moderate advisory (GHSA-3g3m-2fjr-6pw4, fixed in 14.0.2). It's a build tool only, never shipped. Remove the override, then check `npm ls glob` and `npm audit`.
+- **Why it waits:** no `workbox-build` release asks for a fixed `glob` yet.
+- **Starts when:** a `workbox-build` (or `vite-plugin-pwa`) release depends on `glob` 14.0.2 or later.
+
 ## Offline and local data
 
 The first offline release keeps a teacher's unsent work safe when the connection drops after they have signed in. The entries below go further and are deferred.

@@ -81,6 +81,11 @@
     "workbox-precaching": "7.4.1",
     "workbox-routing": "7.4.1"
   },
+  "overrides": {
+    "workbox-build": {
+      "glob": "14.0.5"
+    }
+  },
   "engines": {
     "node": ">=22.13.0"
   }
