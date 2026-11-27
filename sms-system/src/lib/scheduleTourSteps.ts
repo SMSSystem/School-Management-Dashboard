@@ -62,13 +62,11 @@ const TIMETABLE = {
     "The timetable",
     "Each row starts at a lesson time, and gaps of 15 minutes or more show as Free time. The lesson on now has a green ring and today is tinted. Holidays and breaks are greyed with their name. Lessons that overlap get a red Clash tag, and the footer counts the week's lessons and clashes.",
     "#tour-schedule-timetable",
-    "top",
   ),
   family: step(
     "The timetable",
     "Each lesson shows its subject, teacher and room. Gaps of 15 minutes or more show as Free time, the lesson on now has a green ring, and holidays and breaks show their name.",
     "#tour-schedule-timetable",
-    "top",
   ),
 };
 

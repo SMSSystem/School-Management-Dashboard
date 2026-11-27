@@ -104,17 +104,22 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
     />
   );
 
+  // The tour's timetable step points at the TOP of the timetable (the day chips, the grid's header row or the
+  // nothing-scheduled line), never the whole of it: a full week is taller than the screen, and the tour would place
+  // its card above the target, off the screen.
   let main;
   if (state.view === "day" && selectedDay) {
     main = (
       <>
-        <ScheduleDayChips
-          days={week.days}
-          selected={selectedDay.date}
-          withClasses={datesWithClasses(week)}
-          mode={calendar.mode}
-          onSelect={(day) => setState({ ...state, day })}
-        />
+        <div id="tour-schedule-timetable">
+          <ScheduleDayChips
+            days={week.days}
+            selected={selectedDay.date}
+            withClasses={datesWithClasses(week)}
+            mode={calendar.mode}
+            onSelect={(day) => setState({ ...state, day })}
+          />
+        </div>
         <ScheduleDayList
           week={week}
           day={selectedDay}
@@ -125,7 +130,10 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
     );
   } else if (week.lessonCount === 0) {
     main = (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
+      <p
+        id="tour-schedule-timetable"
+        className="text-sm text-gray-500 dark:text-gray-400"
+      >
         {emptyWeekMessage(week, calendar.mode)}
       </p>
     );
@@ -136,6 +144,7 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
         mode={calendar.mode}
         caption={`${title ?? SCHEDULE_TEXT.heading}, week of ${page.rangeLabel}`}
         renderCard={renderCard}
+        headId="tour-schedule-timetable"
       />
     );
   }
@@ -266,9 +275,7 @@ const SchedulePage = () => {
           {empty.text}
         </p>
       ) : (
-        <div id="tour-schedule-timetable">
-          <ScheduleBody page={page} title={title} />
-        </div>
+        <ScheduleBody page={page} title={title} />
       )}
     </div>
   );
