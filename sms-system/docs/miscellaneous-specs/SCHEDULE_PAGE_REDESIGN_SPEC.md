@@ -49,6 +49,9 @@ Lessons are tinted cards: the subject in the subject colour, then the teacher or
 | D13 | A **senior teacher's "A teacher" list** comes from the teacher ids and names stored on subjects (`teacherIds` / `teacherNames`). The users rules let a teacher read only students, plus their own department's teachers, so the full staff list isn't readable to them. This needs no rules change and no extra reads. Admin and spectator use the users list. |
 | D14 | **The week arrows stay within the active academic year** (academic mode) or the active time blocks (custom mode): the calendar data loaded covers only those dates. At an edge the arrow is disabled and a note says the timetable isn't available. |
 | D15 | **A student, or a parent's child, sees one merged personal week** across all their classes, limited to the subjects they take, through `useClassTimetable`. |
+| D16 | **Custom mode: mixed days are decided per lesson.** A day column is greyed only when no running term or block teaches that day. Otherwise each lesson follows its own block: a block's lessons are hidden on that block's own non-school days, and a note under the date names the block and why ("Mechanical Workshop 1: no class, Heroes Day"). |
+| D17 | **A lesson card names its term or block** only when the week shown has lessons from two or more of them. In academic mode that never happens. |
+| D18 | **Wording follows the calendar mode.** A date between terms or blocks reads "Term break" (academic) or "No time block running" (custom). With nothing active: "No term is active" or "No time block is active". The arrows span the earliest active start to the latest end (D14). |
 
 ## 3. Terminology (also for code comments)
 
@@ -84,6 +87,11 @@ Lessons are tinted cards: the subject in the subject colour, then the teacher or
   - Academic mode uses the active year's days.
   - Custom mode uses the union across the active blocks' years.
 - **Non-school days:** a day not in `schoolWeekDays`, a `nonSchoolDays` entry, or a date between two terms. The column is greyed with the reason (the holiday's name, "Mid-term break", "Term break"), and no lessons are drawn.
+- **Custom mode (D16–D18):**
+  - each block keeps its own year's school days and non-school days;
+  - a column is greyed only when no running block teaches that day; otherwise a block that is off that day has its lessons hidden, with a note under the date ("Mechanical Workshop 1: no class, Heroes Day");
+  - lesson cards name their block only when the week shows lessons from two or more blocks;
+  - wording: "No time block running" between blocks, "No time block is active" when none is.
 
 **Markers**
 
@@ -357,3 +365,5 @@ Each pull request runs `npm test`, `npm run lint` and `npm run quality`; B also 
   - the missing docs added;
   - read figures marked as estimates;
   - private source paths replaced by the live demo URL.
+
+**2026-11-27, custom calendar mode.** D16 (mixed days decided per lesson, with a note naming the block that is off), D17 (block names on cards only when two or more are shown) and D18 (wording by calendar mode). The week logic for PR A is built to these rules.

@@ -6,6 +6,7 @@
 > **Primary role:** `institution_admin`
 > **Branch:** `mvp`
 > **Completed:** 2026-06-01
+> **Redesign:** the Schedule page is being rebuilt; see [SCHEDULE_PAGE_REDESIGN_SPEC.md](SCHEDULE_PAGE_REDESIGN_SPEC.md).
 
 ---
 
