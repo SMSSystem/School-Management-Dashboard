@@ -14,13 +14,10 @@ _Nothing yet._
 <details open>
 <summary><strong>v2.64.1</strong> · 2026-11-27 · Schedule Week Logic and Timetable Cache Refresh</summary>
 
-**Fixed**
-
-- A timetable slot that is added, changed or deleted now shows at once on students' and parents' next-class card and calendar, instead of up to ten minutes later.
-
 **Changed**
 
 - Groundwork for the new Schedule page: how a week is laid out (days, lesson rows, free time, clashes, holidays and term breaks, in both calendar modes), who may look at which class or teacher, and the reads it makes. Nothing on the page changes yet.
+- After someone adds, changes or deletes a timetable slot, their own screens show the change at once. Other people's devices still pick it up within ten minutes.
 
 </details>
 

@@ -300,9 +300,10 @@ function invalidateAfterClose(
       queryKey: subjectEnrollmentsKey(institutionId ?? ""),
     });
   }
-  // A timetable slot added, edited or deleted: the Schedule page's staff views (hooks/useWeekTimetable.ts) and the
-  // class timetables behind the next-class card, the dashboard calendar and the student/parent Schedule
-  // (hooks/useClassTimetable.ts). Without this, students and parents saw the change only after up to 10 minutes.
+  // A timetable slot added, edited or deleted: refresh THIS browser's slot caches, the Schedule page's staff views
+  // (hooks/useWeekTimetable.ts) and the class timetables (hooks/useClassTimetable.ts), so the editor sees the change at
+  // once. Other people's devices keep their own cache and refetch when it goes stale (up to 10 minutes); a live
+  // listener would cost reads on the free tier.
   if (table === "timetable_slot") {
     queryClient.invalidateQueries({
       queryKey: ["scheduleSlots", institutionId],

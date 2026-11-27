@@ -49,7 +49,7 @@ async function fetchWeekSlots(
  *
  * Reads once and caches (no live listener): the key holds the class or teacher and the term ids, never the week, so
  * moving between weeks of the same term costs no reads. FormModal invalidates `['scheduleSlots', institutionId]`
- * after a slot is added, edited or deleted.
+ * in this browser after a slot is added, edited or deleted; other devices refetch when their cache goes stale.
  *
  * Kept in memory only: 'scheduleSlots' is deliberately not in lib/queryPersistence.ts's allow-list. Slots carry
  * teacher names, and the compliance storage table describes that sessionStorage cache as holding no personal data.

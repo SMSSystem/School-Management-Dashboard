@@ -3,7 +3,7 @@
 // - Admin and spectator: any class or teacher; the teacher list is the users list (only they may read it).
 // - Senior teacher: any class or teacher too, but the users rules let a teacher read only students and their own
 //   department's teachers, so the teacher list comes from the teacher ids and names stored on subjects (D13). A
-//   teacher who teaches no subject is not on it (accepted; recorded in ISSUES_AND_GAPS).
+//   teacher who teaches no subject is not on it (accepted; ISSUES_AND_GAPS #87).
 // - Regular teacher: only their own week (D2; a dropdown of the classes they teach is in BACKLOG).
 // - Student and parent: the student's merged week across their classes (D15).
 

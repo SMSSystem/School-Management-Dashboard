@@ -1,6 +1,6 @@
 # Schedule Page Redesign: Spec
 
-> **Status:** spec only, nothing built. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D15 (section 2).
+> **Status:** PR A (the week logic, the reads and the cache refresh) is built, in v2.64.1; the page (B) and the tour (C) are still to come. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
 > **Base:** app v2.64.0. Where this spec says "today", it means the app as of that version.
 > **Model:** the SMS Demo, demo version v1.0.4, live at `https://sms-demo.solutions.genr83d.com/dashboard/schedule`. It was walked as all five roles on 2026-11-27. The demo's source code is private.
 > **Scope of this document:** what the page does and why, for every role. A step-by-step build plan is kept separately and privately; this spec holds every decision.
@@ -179,7 +179,7 @@ src/hooks/
 - **Week arrows within the same term cost no reads.** Each class, teacher or term viewed costs one query.
 - **Estimates** (from the Blue Mountain demo seed; to be measured): today an admin's listener reads about 300 slot documents per visit and keeps a connection open; the new page reads about 25–40.
 - **Students and parents** keep `useClassTimetable`, with the same `nextClassSlots` key as the dashboard, so the page costs no extra reads. A week in another term inside the bounds costs one query per class.
-- **After a slot add, edit or delete,** `['scheduleSlots', institutionId]` and `['nextClassSlots', institutionId]` are invalidated. This fixes today's up-to-10-minute delay before an edit shows on students' and parents' dashboards.
+- **After a slot add, edit or delete,** `['scheduleSlots', institutionId]` and `['nextClassSlots', institutionId]` are invalidated in the editor's browser, so the person who made the change sees it at once. Other devices (students, parents, other staff) keep their own cache and still see it within 10 minutes; that is accepted, because a live listener would cost reads on the free tier.
 - **Overall:** reads go down; no writes are added; no Cloud Functions.
 
 ## 6. Firebase
@@ -263,7 +263,7 @@ A `scheduleTourTargets.test.ts`, like the existing `*TourTargets*` tests, checks
 
 | PR | Contents | Suggested version |
 |---|---|---|
-| A | `weekSchedule.ts`, `scheduleChoices.ts`, `scheduleUrl.ts` with unit tests; `useWeekTimetable`; the optional term list on `useClassTimetable`; the FormModal cache refresh; doc pointers | patch (the cache refresh is visible) |
+| A | `weekSchedule.ts`, `scheduleChoices.ts`, `scheduleUrl.ts` with unit tests; `useWeekTimetable`; the optional term list on `useClassTimetable`; the FormModal cache refresh; doc pointers | patch (internal groundwork) |
 | B | The new page and its components; editing restyled with the department limit; the Delegate panel moved; `MobileSchedule` and the Term picker removed; pins and e2e updated, plus a new e2e for the week page; docs | minor |
 | C | The tour, its button, the target test, docs | minor |
 

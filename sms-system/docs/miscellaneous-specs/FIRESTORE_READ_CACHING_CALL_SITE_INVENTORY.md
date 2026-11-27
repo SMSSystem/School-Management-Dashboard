@@ -511,8 +511,8 @@ _(No `onSnapshot`/`getDocs` reads against this collection outside generateReport
 
 **onSnapshot — REUSABLE component:**
 
-- `hooks/useClassTimetable.ts` — `where(classId==)+where(termId in [active terms])`. One cached `getDocs` (query key `nextClassSlots`, 10 min, persisted), shared by the next-class card, dashboard calendar and the student/parent Schedule page. An optional `termIdsOverride` reads other terms of the active year (for the redesigned Schedule page); without it the key and the read are unchanged. `FormModal` invalidates `nextClassSlots` after a timetable slot is saved or deleted.
-- `hooks/useWeekTimetable.ts` (Schedule page redesign) — `where(classId==)` or `where(teacherId==)` + `where(termId in [the week's terms])`, chunks of 30. One cached `getDocs` (query key `scheduleSlots`, 10 min, **memory only**: slots carry teacher names, so it stays off the sessionStorage allow-list). `FormModal` invalidates it after a timetable slot is saved or deleted.
+- `hooks/useClassTimetable.ts` — `where(classId==)+where(termId in [active terms])`. One cached `getDocs` (query key `nextClassSlots`, 10 min, persisted), shared by the next-class card, dashboard calendar and the student/parent Schedule page. An optional `termIdsOverride` reads other terms of the active year (for the redesigned Schedule page); without it the key and the read are unchanged. `FormModal` invalidates `nextClassSlots` after a timetable slot is saved or deleted (this browser only; other devices refetch when stale).
+- `hooks/useWeekTimetable.ts` (Schedule page redesign) — `where(classId==)` or `where(teacherId==)` + `where(termId in [the week's terms])`, chunks of 30. One cached `getDocs` (query key `scheduleSlots`, 10 min, **memory only**: slots carry teacher names, so it stays off the sessionStorage allow-list). `FormModal` invalidates it after a timetable slot is saved or deleted (this browser only).
 - `components/BigCalender.tsx:126-148` — `where(teacherId==)+where(termId==)` OR `where(classId==)+where(termId==)` depending on role. useEffect. Personal/class schedule calendar (used by dashboard, Teacher detail, Student, Parent views).
 
 **onSnapshot — ONE-OFF:**

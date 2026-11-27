@@ -1300,6 +1300,14 @@ A list of small bugs and gaps reported from the live app, fixed together on bran
 - **Limit:** the A–Z sort and the subject filters cover the notes and exams already loaded (the newest 100 lesson notes per listener), not the whole collection. A note that has dropped past the 100 cap no longer comes back by being edited.
 - Index deploy needed **before** the build ships: `firebase deploy --only firestore:indexes`, then wait for the four `lessonNotes` `createdAt` indexes to be READY. Until then teachers, students and parents see "Could not load lesson notes".
 
+### 87. Schedule page: a senior teacher's teacher list comes from subjects
+
+On the redesigned Schedule page (spec `docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`, decision D13), a senior teacher's "A teacher" list is built from the teacher ids and names stored on subjects (`teacherIds` / `teacherNames`, in `src/lib/schedule/scheduleChoices.ts`). The users rules let a teacher read only students and their own department's teachers, so the full staff list isn't readable to them.
+
+- **Limit:** a teacher who teaches no subject is not on the list, so a senior teacher can't open that teacher's week. The senior teacher themself is always on it. Admins and spectators use the users list and are not affected.
+- **Accepted** for now: it needs no rules change and no extra reads.
+- **Fix, if needed:** a rules change that lets senior teachers list teaching staff, or a server-side staff list.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation
