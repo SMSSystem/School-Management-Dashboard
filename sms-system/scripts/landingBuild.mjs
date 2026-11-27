@@ -50,6 +50,34 @@ async function renderLanding({ root, plugins, alias, define }) {
 }
 
 /**
+ * Development only (`npm run dev`): with the landing page on, answer a page load of `/` with landing.html, so the dev
+ * server shows what production shows. Every other path (/login, /dashboard, ...) is untouched and still gets the app.
+ * With the landing page off this does nothing and `/` is the app, as in production.
+ * @param {{ enabled: boolean }} options
+ * @returns {import('vite').Plugin}
+ */
+export function landingDevRoot({ enabled }) {
+  return {
+    name: "sms-landing-dev-root",
+    apply: "serve",
+    configureServer(server) {
+      if (!enabled) return;
+      // Runs before Vite's own middleware, which then serves (and transforms) landing.html as if it had been asked for.
+      server.middlewares.use((req, _res, next) => {
+        const [path, query] = (req.url ?? "").split("?");
+        if (
+          path === "/" &&
+          req.method === "GET" &&
+          (req.headers.accept ?? "").includes("text/html")
+        )
+          req.url = "/landing.html" + (query ? `?${query}` : "");
+        next();
+      });
+    },
+  };
+}
+
+/**
  * @param {{ enabled: boolean, root: string, ssrPlugins: import('vite').PluginOption[], alias: Record<string, string>, define: Record<string, string> }} options
  * @returns {import('vite').Plugin}
  */
@@ -76,7 +104,12 @@ export function landingBuild({ enabled, root, ssrPlugins, alias, define }) {
         this.error(
           "landing build: VITE_LANDING_ENABLED is on but landing.html was not built",
         );
-      const template = String(landing.source);
+      // Drop landing.html's own comments (notes for developers) so they never ship in the public page source; the slot
+      // comment is kept until the markup replaces it.
+      const template = String(landing.source).replace(
+        /<!--(?!landing-prerender-->)[\s\S]*?-->\s*/g,
+        "",
+      );
       if (!template.includes(LANDING_SLOT))
         this.error(`landing build: landing.html has no ${LANDING_SLOT}`);
       const markup = await renderLanding({

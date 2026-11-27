@@ -2,8 +2,8 @@
 <!--
   The public landing page (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). Built only when VITE_LANDING_ENABLED is
   "true"; the build then renders src/landing/LandingPage.tsx into the comment below and writes this file as
-  dist/index.html, the page Vercel serves at `/` (scripts/landingBuild.mjs). In `npm run dev` open /landing.html; it
-  renders in the browser instead.
+  dist/index.html, the page Vercel serves at `/` (scripts/landingBuild.mjs). With the flag on, `npm run dev` serves it at
+  `/` too and renders it in the browser instead. Comments in this file are removed from the built page.
 
   Nothing here may load Firebase, reCAPTCHA or the app's code: the page has to stay small, private and fast.
 -->
