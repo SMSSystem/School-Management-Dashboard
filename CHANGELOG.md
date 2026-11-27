@@ -10,6 +10,10 @@ All notable changes to the School Management System, newest first. Versions foll
 
 - A tour of the Schedule page: the **Take a tour** button beside the heading walks you through whose week it is, moving between weeks, the timetable and, for those who can, adding lessons and giving access. Each role sees the steps that apply to it, and the tour never starts by itself.
 
+**Fixed**
+
+- The tour cards fit a phone screen. They were 448 px wide and ran off a 375 px screen, which matters now that students and parents have a page tour.
+
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
 <a id="v2.65.0"></a>

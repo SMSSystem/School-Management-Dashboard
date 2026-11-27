@@ -24,7 +24,9 @@ const TourCard = ({
   const progressPct = ((currentStep + 1) / totalSteps) * 100;
 
   const handleNext = async () => {
-    const gate = currentTour ? tourValidation[currentTour]?.[currentStep] : undefined;
+    const gate = currentTour
+      ? tourValidation[currentTour]?.[currentStep]
+      : undefined;
     if (gate && !(await gate.validation())) {
       setBlockedMessage(gate.validationMessage);
       return;
@@ -34,7 +36,9 @@ const TourCard = ({
   };
 
   return (
-    <div className="min-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl">
+    // 28rem wide, but never wider than the screen less a margin: page tours reach phones (the Schedule tour is the
+    // first one students and parents get), where a fixed 448 px card ran off a 375 px screen.
+    <div className="w-[min(28rem,calc(100vw-2rem))] bg-white dark:bg-gray-800 rounded-xl shadow-xl">
       <div className="p-5 flex flex-col gap-3">
         <div className="h-1 bg-gray-100 dark:bg-gray-700 rounded-xl overflow-hidden">
           <div
