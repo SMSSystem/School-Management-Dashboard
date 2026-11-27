@@ -169,9 +169,10 @@ VITE_FIREBASE_DATABASE_URL="https://<project-id>-default-rtdb.firebaseio.com"
 VITE_SINGLE_SESSION_ENABLED="true"
 VITE_EMAIL_ENABLED="true"
 VITE_APP_URL="https://your-app.example"
+VITE_LANDING_ENABLED="true"
 ```
 
-`VITE_FIREBASE_DATABASE_URL` is **required in every environment** (large attachments and the one-session-per-account lock use the Realtime Database; copy the exact URL from the console, no trailing slash). `VITE_FIREBASE_APPCHECK_SITE_KEY` is the reCAPTCHA key App Check uses; `VITE_FIREBASE_APPCHECK_DEBUG_TOKEN` is read in development only. `VITE_SINGLE_SESSION_ENABLED`, `VITE_EMAIL_ENABLED` and `VITE_APP_URL` are production-only switches (the session lock, the "Send sign-in email" button and the link it sends): leave them unset in development, previews and e2e. Each is explained in `.env.example`.
+`VITE_FIREBASE_DATABASE_URL` is **required in every environment** (large attachments and the one-session-per-account lock use the Realtime Database; copy the exact URL from the console, no trailing slash). `VITE_FIREBASE_APPCHECK_SITE_KEY` is the reCAPTCHA key App Check uses; `VITE_FIREBASE_APPCHECK_DEBUG_TOKEN` is read in development only. `VITE_SINGLE_SESSION_ENABLED`, `VITE_EMAIL_ENABLED` and `VITE_APP_URL` are production-only switches (the session lock, the "Send sign-in email" button and the link it sends): leave them unset in development, previews and e2e. `VITE_LANDING_ENABLED` turns on the public landing page at `/` (off until launch; [docs/miscellaneous-specs/LANDING_PAGE_SPEC.md](docs/miscellaneous-specs/LANDING_PAGE_SPEC.md)). Each is explained in `.env.example`.
 
 ### `VITE_USE_MOCK_DATA` (development only)
 
@@ -242,6 +243,7 @@ Set the following in Vercel's project settings (**Settings → Environment Varia
 
 - All `VITE_FIREBASE_*` variables from `.env.local`, including `VITE_FIREBASE_DATABASE_URL`
 - `VITE_SINGLE_SESSION_ENABLED`, `VITE_EMAIL_ENABLED` and `VITE_APP_URL` for production (see [Environment variables](#environment-variables))
+- `VITE_LANDING_ENABLED` only where the landing page should show (a preview until launch); changing it needs a redeploy
 
 Set the **Root Directory** to `sms-system` in Vercel's build settings.
 
@@ -258,7 +260,7 @@ Each merge to `main` that raises the version is tagged `v<version>` and gets a G
 
 ### SPA routing
 
-The app uses client-side routing via react-router-dom. Vercel handles this automatically for Vite projects. If deploying elsewhere, configure the server to serve `index.html` for all routes (a `vercel.json` rewrite rule or an equivalent `_redirects` / `nginx.conf` entry).
+The app uses client-side routing via react-router-dom. `vercel.json` sends every path except `/`, `/assets/` and `/sw.js` to `/app.html`, a copy of the app's `index.html` that every build writes; `/` is the real file `dist/index.html` (the app, or the landing page when `VITE_LANDING_ENABLED` is on; see [docs/miscellaneous-specs/LANDING_PAGE_SPEC.md](docs/miscellaneous-specs/LANDING_PAGE_SPEC.md)). If deploying elsewhere, configure the server the same way: `/` serves `index.html`, every other route serves `app.html`.
 
 ### Production checklist
 
