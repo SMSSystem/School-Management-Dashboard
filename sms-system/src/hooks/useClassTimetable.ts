@@ -1,20 +1,44 @@
-import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
-import { getDocs, query, where } from 'firebase/firestore';
-import type { NonSchoolDayDocument, TimetableSlotDocument } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
-import { DATA_MODE } from '@/lib/data';
-import { institutionCollection } from '@/lib/paths';
-import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
-import type { DateRange, SlotLite } from '@/lib/nextClass';
-import { activeTerms } from '@/lib/scheduleDay';
-import { classIdsOf, takesSubject, type ClassMembership } from '@/lib/studentClasses';
-import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
+import { useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { getDocs, query, where } from "firebase/firestore";
+import type {
+  NonSchoolDayDocument,
+  TimetableSlotDocument,
+} from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { DATA_MODE } from "@/lib/data";
+import { institutionCollection } from "@/lib/paths";
+import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
+import type { DateRange, SlotLite } from "@/lib/nextClass";
+import { activeTerms } from "@/lib/scheduleDay";
+import {
+  classIdsOf,
+  takesSubject,
+  type ClassMembership,
+} from "@/lib/studentClasses";
+import { REFERENCE_STALE_MS } from "@/lib/queryPolicies";
 
 function nonSchoolRange(n: NonSchoolDayDocument): DateRange | null {
-  if (n.type === 'single' && n.date) return { start: n.date, end: n.date };
-  if (n.type === 'range' && n.startDate && n.endDate) return { start: n.startDate, end: n.endDate };
+  if (n.type === "single" && n.date) return { start: n.date, end: n.date };
+  if (n.type === "range" && n.startDate && n.endDate)
+    return { start: n.startDate, end: n.endDate };
   return null;
+}
+
+// A stable key for the override (sorted, de-duplicated ids), or null when there is none.
+function overrideKeyOf(termIdsOverride: string[] | undefined): string | null {
+  return termIdsOverride
+    ? [...new Set(termIdsOverride)].sort().join(",")
+    : null;
+}
+
+// The terms to read: the override's (a sorted, comma-joined id list, '' for none) when given, else the active ones.
+function termIdsToRead(
+  overrideKey: string | null,
+  activeTermList: { id: string }[],
+): string[] {
+  if (overrideKey === null) return activeTermList.map((t) => t.id);
+  return overrideKey ? overrideKey.split(",") : [];
 }
 
 export type ClassTimetable = {
@@ -35,32 +59,54 @@ export type ClassTimetable = {
 // `source` is one class id, or a student's classes (lib/studentClasses.ts): one read per class, merged, with the
 // slots of an additional class limited to the subjects the student takes there. A student object must keep its
 // identity between renders (pass the one from useAuth()/the linked children, or memoise it).
-export function useClassTimetable(source: string | ClassMembership | null | undefined): ClassTimetable {
+//
+// `termIdsOverride` (the Schedule page): read these terms instead of the active ones, so a week in another term of
+// the active year still shows. Without it nothing changes, so the dashboard keeps its key and its one read.
+export function useClassTimetable(
+  source: string | ClassMembership | null | undefined,
+  termIdsOverride?: string[],
+): ClassTimetable {
   const { institutionId } = useAuth();
-  const membership = source && typeof source === 'object' ? source : null;
+  const membership = source && typeof source === "object" ? source : null;
+  const classKey =
+    typeof source === "string"
+      ? source
+      : source
+        ? classIdsOf(source).join(",")
+        : "";
   const classIds = useMemo(
-    () => (typeof source === 'string' ? [source] : source ? classIdsOf(source) : []),
+    () =>
+      typeof source === "string" ? [source] : source ? classIdsOf(source) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [typeof source === 'string' ? source : source ? classIdsOf(source).join(',') : ''],
+    [classKey],
   );
-  const { activeTerm, activeTimeBlocks, nonSchoolDays, nonSchoolDaysByTermId, loading: calLoading } =
-    useInstitutionAcademicCalendar();
+  const {
+    activeTerm,
+    activeTimeBlocks,
+    nonSchoolDays,
+    nonSchoolDaysByTermId,
+    loading: calLoading,
+  } = useInstitutionAcademicCalendar();
 
   const terms = useMemo(
     () => activeTerms(activeTimeBlocks, activeTerm),
     [activeTerm, activeTimeBlocks],
   );
-  const termIds = useMemo(() => terms.map((t) => t.id), [terms]);
+  const overrideKey = overrideKeyOf(termIdsOverride);
+  const termIds = useMemo(
+    () => termIdsToRead(overrideKey, terms),
+    [terms, overrideKey],
+  );
 
   const slotsQueries = useQueries({
     queries: classIds.map((classId) => ({
-      queryKey: ['nextClassSlots', institutionId, classId, termIds.join(',')],
+      queryKey: ["nextClassSlots", institutionId, classId, termIds.join(",")],
       queryFn: async (): Promise<SlotLite[]> => {
         const snap = await getDocs(
           query(
-            institutionCollection(institutionId!, 'timetable_slots'),
-            where('classId', '==', classId),
-            where('termId', 'in', termIds),
+            institutionCollection(institutionId!, "timetable_slots"),
+            where("classId", "==", classId),
+            where("termId", "in", termIds),
           ),
         );
         return snap.docs.map((d) => {
@@ -80,21 +126,31 @@ export function useClassTimetable(source: string | ClassMembership | null | unde
           };
         });
       },
-      enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*' && termIds.length > 0,
+      enabled:
+        DATA_MODE === "live" &&
+        !!institutionId &&
+        institutionId !== "*" &&
+        termIds.length > 0,
       staleTime: REFERENCE_STALE_MS,
     })),
   });
 
-  const loaded = classIds.length > 0 && slotsQueries.every((q) => q.data !== undefined);
+  const loaded =
+    classIds.length > 0 && slotsQueries.every((q) => q.data !== undefined);
   // A string that changes when any class's slots do (the list of queries can change length).
-  const updated = slotsQueries.map((q) => q.dataUpdatedAt).join(',');
+  const updated = slotsQueries.map((q) => q.dataUpdatedAt).join(",");
   const slots = useMemo(() => {
     if (!loaded) return undefined;
     const all = slotsQueries.flatMap((q) => q.data ?? []);
     // An additional class gives only the subjects the student takes there; slots cached before the
     // subject was stored have none and are kept.
     return membership
-      ? all.filter((s) => !s.classId || !s.subjectId || takesSubject(membership, s.classId, s.subjectId))
+      ? all.filter(
+          (s) =>
+            !s.classId ||
+            !s.subjectId ||
+            takesSubject(membership, s.classId, s.subjectId),
+        )
       : all;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, membership, updated]);
@@ -117,7 +173,9 @@ export function useClassTimetable(source: string | ClassMembership | null | unde
     slots,
     termRanges,
     nonSchoolRanges,
-    loading: calLoading || slotsQueries.some((q) => q.isLoading && q.fetchStatus !== 'idle'),
+    loading:
+      calLoading ||
+      slotsQueries.some((q) => q.isLoading && q.fetchStatus !== "idle"),
     error: slotsQueries.some((q) => q.isError),
   };
 }
