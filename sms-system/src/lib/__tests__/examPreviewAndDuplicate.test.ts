@@ -114,7 +114,7 @@ describe("the Exams list buttons", () => {
     );
     expect(actions).toContain('triggerIcon="copy"');
     expect(modal).toContain("look.triggerLabel ??");
-    expect(modal).toContain('look.triggerIcon === "copy" && <Copy');
+    expect(flat(modal)).toContain(flat('look.triggerIcon === "copy" && <Copy'));
   });
 });
 

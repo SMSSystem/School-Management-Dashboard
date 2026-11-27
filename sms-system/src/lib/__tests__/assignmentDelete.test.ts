@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { flat } from "./sourceText";
 import { assignmentDeleteWarning } from "../assignmentDeleteLogic";
 import { assignmentDeleteDetail } from "../teacherAudit";
 import cascadeRaw from "../assignmentDelete.ts?raw";
@@ -98,17 +99,23 @@ describe("the delete path and the dialog", () => {
   });
 
   it("shows the counts in the delete dialog", () => {
-    expect(norm(formModalSource)).toContain(
-      '<AssignmentDeleteNotice table={table} institutionId={institutionId} assignmentId={String(id)} />',
+    expect(flat(formModalSource)).toContain(
+      flat(
+        "<AssignmentDeleteNotice table={table} institutionId={institutionId} assignmentId={String(id)} />",
+      ),
     );
   });
 });
 
 describe("the frozen rubric grid", () => {
   it("is deleted with the assignment's other documents, before the assignment", () => {
-    const body = cascade.slice(cascade.indexOf("export async function deleteAssignmentCascade"));
+    const body = cascade.slice(
+      cascade.indexOf("export async function deleteAssignmentCascade"),
+    );
     const frozen = body.indexOf('"rubric",');
     expect(frozen).toBeGreaterThan(-1);
-    expect(frozen).toBeLessThan(body.indexOf("for (const group of chunkOperations(refs))"));
+    expect(frozen).toBeLessThan(
+      body.indexOf("for (const group of chunkOperations(refs))"),
+    );
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { flat } from "./sourceText";
 import {
   collectionNameFor,
   deleteDialogFor,
@@ -160,8 +161,10 @@ describe("the dialog", () => {
     expect(formModal).toContain(
       'renderForm(table, type, data, closeModal) ?? "Form not found!"',
     );
-    expect(formModal).toContain(
-      'await deleteRecord(table, institutionId!, String(id), user ? { uid: user.uid, name: displayName ?? "" } : undefined);',
+    expect(flat(formModal)).toContain(
+      flat(
+        'await deleteRecord(table, institutionId!, String(id), user ? { uid: user.uid, name: displayName ?? "" } : undefined);',
+      ),
     );
     expect(formModal).toContain('"Failed to delete. Please try again."');
     expect(formModal).toContain("if (USERS_QUERY_TABLES.has(table)) {");

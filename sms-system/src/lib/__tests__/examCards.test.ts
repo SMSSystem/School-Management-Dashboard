@@ -89,8 +89,10 @@ describe("the size of the buttons", () => {
     );
     expect(actions.match(/className=\{linkCls\}/g)).toHaveLength(3);
     expect(actions).toContain("touch={touch}");
-    expect(modal).toContain(
-      'props.touch ? "w-11 h-11" : type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7"',
+    expect(flat(modal)).toContain(
+      flat(
+        'props.touch ? "w-11 h-11" : type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7"',
+      ),
     );
   });
 });
