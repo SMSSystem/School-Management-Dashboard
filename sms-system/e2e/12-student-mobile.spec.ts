@@ -251,6 +251,8 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
   test.describe.configure({ mode: 'serial' });
 
   let studentClassId: string | undefined;
+  // Every class of the student (home first): the Schedule page shows their merged week (spec D15).
+  let studentClassIds: string[] = [];
   let studentClassName = '';
   // Only the notes THIS spec seeds are ever deleted (never a prefix sweep).
   const seededNoteIds: string[] = [];
@@ -260,6 +262,8 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     const student = await userByEmail(STUDENT.email!);
     studentClassId = student.classId;
     test.skip(!studentClassId, 'The QA student has no class');
+    const extra = ((await db().collection('users').doc(student.uid).get()).data()?.classIds as string[] | undefined) ?? [];
+    studentClassIds = [studentClassId!, ...extra];
     const iid = await institutionId();
     const cls = await db().collection('institutions').doc(iid).collection('classes').doc(studentClassId!).get();
     studentClassName = (cls.data()?.name as string) ?? '';
@@ -331,29 +335,38 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     });
   });
 
-  test('Schedule: day strip + agenda, own class only', async ({ page, context }) => {
+  test('Schedule: day chips + agenda on a phone, own classes only', async ({ page, context }) => {
     await forceLiveData(context);
     await loginAsStudent(page);
     await page.goto('/dashboard/schedule');
 
-    // Students have no term picker: the page shows the class's slots across
-    // every currently active term / time block.
+    // Students have no Term picker and no class or teacher choice: the page shows their own merged week, and a
+    // phone gets the day view only (no Week | Day switch).
     const iid = await institutionId();
     const slotsSnap = await db().collection('institutions').doc(iid).collection('timetable_slots').get();
     const strip = page.getByRole('group', { name: 'Day of the week' });
     await expect(strip).toBeVisible({ timeout: 25_000 });
-    await expect(strip.getByRole('button')).toHaveCount(6);
+    const chips = strip.getByRole('button');
+    // Monday to Friday, plus Saturday only when the school or a slot uses it.
+    expect([5, 6]).toContain(await chips.count());
     await expect(page.getByLabel('Term')).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'View' })).toHaveCount(0);
+    await expect(page.getByLabel('Show a class or a teacher')).toHaveCount(0);
+
+    // Two separate states: today's chip has "(today)" in its name; the selected chip is pressed. On first load,
+    // when today is in the week shown, they are the same chip; otherwise exactly one chip is selected.
+    const todayChip = strip.getByRole('button', { name: /(today)/ });
+    if ((await todayChip.count()) > 0) {
+      await expect(todayChip).toHaveAttribute('aria-pressed', 'true');
+    }
+    await expect(strip.locator('button[aria-pressed="true"]')).toHaveCount(1);
 
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0 … Sun=6
-    const todayName = DAYS[todayIdx > 5 ? 0 : todayIdx];
-    await expect(strip.getByRole('button', { name: new RegExp(`^${todayName} \\(today\\)`) })).toHaveAttribute('aria-pressed', 'true');
-
     const seen: string[] = [];
-    for (const day of DAYS) {
-      await strip.getByRole('button', { name: new RegExp(`^${day}`) }).click();
-      await expect(page.getByRole('heading', { level: 2, name: new RegExp(`^${day}`) })).toBeVisible();
+    for (let i = 0; i < (await chips.count()); i++) {
+      await chips.nth(i).click();
+      await expect(chips.nth(i)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('heading', { level: 3, name: new RegExp(`^${DAYS[i]}, `) })).toBeVisible();
       seen.push(await page.locator('main').innerText());
     }
 
@@ -362,7 +375,7 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     const others = new Set<string>();
     for (const s of slotsSnap.docs) {
       const d = s.data();
-      (d.classId === studentClassId ? own : others).add(d.subjectName as string);
+      (studentClassIds.includes(d.classId as string) ? own : others).add(d.subjectName as string);
     }
     const foreign = [...others].filter((n) => n && !own.has(n));
     const everything = seen.join('\n');
