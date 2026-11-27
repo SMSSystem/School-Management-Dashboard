@@ -1309,6 +1309,17 @@ On the redesigned Schedule page (spec `docs/miscellaneous-specs/SCHEDULE_PAGE_RE
 - **Accepted** for now: it needs no rules change and no extra reads.
 - **Fix, if needed:** a rules change that lets senior teachers list teaching staff, or a server-side staff list.
 
+### 88. Senior teachers had an empty teacher list in the timetable-slot form ✅ Resolved
+
+**Problem.** A senior teacher with schedule access (`canGenerateSchedule`) adds and edits slots for their own department's teachers only. The slot form read those teachers with a users query, but the users rules let a teacher read **student** profiles only, so the query was always refused and the teacher list was empty. The query also filtered `departmentId` by AuthContext's `department`, which is the department's **name**, not its id. The redesigned Schedule page used the same list for its edit check, so a senior teacher with access saw no Edit buttons.
+
+**Fix (Schedule redesign PR B).**
+
+- `firestore.rules` (`match /users/{uid}`): a senior teacher may read teachers whose `departmentId` equals their own; nobody else's profile opens up. Tested in `rules-tests/departmentTeachers.rules.test.ts`.
+- `hooks/useDepartmentTeachers.ts` queries by the reader's `departmentId` (one cached read, shared by the slot form and the Schedule page).
+- **Deploy:** `npm run firebase:deploy:rules` before the build ships.
+- **Privacy:** a senior teacher can read the whole profile of their department's teachers, not only names (rules can't limit fields). Accepted.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation

@@ -18,9 +18,17 @@ All notable changes to the School Management System, newest first. Versions foll
 - The Schedule page has no Term picker: the week decides the term, inside the active school year (or the active time blocks). Choosing a week no longer changes the term on Gradebook and the other pages.
 - A senior teacher with schedule access can edit only lessons whose teacher is in their own department, the same teachers the slot form lets them pick.
 
+**Fixed**
+
+- Senior teachers with schedule access can pick their own department's teachers when adding or editing a timetable slot (the list was empty), and can edit their department's lessons on the Schedule page.
+
 **Removed**
 
 - The old list of weekdays on the Schedule page, and its separate phone layout.
+
+**Deploy notes**
+
+- Deploy the Firestore rules **before** this build ships: `npm run firebase:deploy:rules` from `sms-system/` (`firebase deploy --only firestore:rules`). The new clause lets a senior teacher read the profiles of their own department's teachers; without it, senior teachers still get an empty teacher list and no Edit buttons.
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
