@@ -1,11 +1,20 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { dismissTourIfPresent, forceLiveData, login } from './helpers';
-import { HAS_ADMIN_SDK, db, institutionId, userByEmail } from './lesson-notes-support';
+import {
+  HAS_ADMIN_SDK,
+  db,
+  institutionId,
+  restoreUserFields,
+  setUserFields,
+  snapshotUser,
+  userByEmail,
+} from './lesson-notes-support';
 
 // The redesigned Schedule page (docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md, PR B), driven against the
-// live QA institution. Read-only: it changes no data. Reads stay small: each class or teacher week is one cached
-// query, and moving between weeks of the same term reads nothing.
+// live QA institution. Read-only except one test, which gives the QA senior teacher schedule access and takes it away
+// again. Reads stay small: each class or teacher week is one cached query, and moving between weeks of the same term
+// reads nothing.
 
 const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME;
 const ADMIN = { email: process.env.QA_ADMIN_EMAIL, password: process.env.QA_ADMIN_PASSWORD };
@@ -139,6 +148,46 @@ test('senior teacher: opens on their own week, and may look at other teachers', 
   // The list comes from the subjects' teachers (spec D13), so it is not limited to the senior teacher's department.
   expect(await teacher.locator('option').count()).toBeGreaterThanOrEqual(1);
   await expect(page.getByLabel('Show a class or a teacher')).toBeVisible();
+});
+
+// Needs the firestore.rules clause that lets a senior teacher read their own department's teachers (deploy it first:
+// npm run firebase:deploy:rules). The QA senior teacher gets schedule access for the test and loses it after.
+test("senior teacher with schedule access: Edit only on their own department's lessons", async ({ page, context }) => {
+  test.skip(!SENIOR.email || !SENIOR.password || !HAS_ADMIN_SDK, 'QA senior teacher or service account missing');
+  const me = await userByEmail(SENIOR.email!);
+  test.skip(!me.departmentId, 'The QA senior teacher has no department');
+  const iid = await institutionId();
+  const deptTeachers = await db()
+    .collection('users')
+    .where('institutionId', '==', iid)
+    .where('departmentId', '==', me.departmentId)
+    .get();
+  const deptIds = new Set(deptTeachers.docs.map((d) => d.id));
+  const slots = await db().collection('institutions').doc(iid).collection('timetable_slots').get();
+  const own = slots.docs.find((d) => deptIds.has(d.data().teacherId as string));
+  const other = slots.docs.find((d) => d.data().teacherId && !deptIds.has(d.data().teacherId as string));
+  test.skip(!own || !other, 'The QA timetable needs lessons from inside and outside the department');
+
+  const before = await snapshotUser(me.uid);
+  try {
+    await setUserFields(me.uid, { canGenerateSchedule: true });
+    await forceLiveData(context);
+    await signIn(page, SENIOR);
+    const edit = page.getByRole('button', { name: 'Edit timetable slot' });
+
+    // A week of a teacher in their own department: Edit on the lessons.
+    await openSchedule(page, `?by=teacher&id=${own!.data().teacherId}&view=week`);
+    await expect(page.getByRole('button', { name: 'Next week' })).toBeVisible({ timeout: 25_000 });
+    await expect(edit.first()).toBeVisible({ timeout: 20_000 });
+
+    // A teacher in another department: the lessons show, with no Edit.
+    await openSchedule(page, `?by=teacher&id=${other!.data().teacherId}&view=week`);
+    await expect(page.getByRole('button', { name: 'Next week' })).toBeVisible({ timeout: 25_000 });
+    await page.waitForTimeout(3_000);
+    await expect(edit).toHaveCount(0);
+  } finally {
+    await restoreUserFields(me.uid, before, ['canGenerateSchedule']);
+  }
 });
 
 test('parent: the child\'s timetable, with a chip per child when there are several', async ({ page, context }) => {
