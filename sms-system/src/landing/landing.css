@@ -1,0 +1,453 @@
+/*
+  The landing page's own stylesheet (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). Separate from the app's
+  src/index.css: it is loaded only by landing.html, so its tokens and base rules never reach the dashboard.
+
+  Rules that every part of the page follows:
+  - Sizes are in rem/em, never px, so the whole page scales with the root size below (type, spacing, radii, widths,
+    icons and images alike).
+  - Without JavaScript the page is complete and readable; `html.js` (set by public/landing-boot.js) turns on the
+    enhancements.
+  - Motion runs only under `prefers-reduced-motion: no-preference`; the last rule in this file stops the rest.
+  - Hover styles only apply on devices that can hover (Tailwind's `hover:` already uses `(hover: hover)`);
+    touch devices (`pointer: coarse`) get 44px targets and the swipeable feature strip.
+*/
+
+/* Scan only the landing page (and the two shared components it renders) for class names, never the whole app. */
+@import "tailwindcss" source(none);
+@source '.';
+@source '../components/OutsideLink.tsx';
+@source '../components/Genr8Logo.tsx';
+
+/* Dark styles: with JavaScript the `.dark` class decides (the visitor's choice or their device); without JavaScript the
+   device setting decides directly. */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(html:not(.js), html:not(.js) *) {
+      @slot;
+    }
+  }
+}
+/* `js:` and `nojs:` variants for the few things that differ with JavaScript on or off. */
+@custom-variant js (&:where(html.js, html.js *));
+@custom-variant nojs (&:where(html:not(.js), html:not(.js) *));
+/* Phones and tablets with a finger as the pointer (the swipe strip, bigger targets). */
+@custom-variant coarse (@media (pointer: coarse));
+
+/* Fonts (SIL Open Font License; licence texts in public/licenses/). Roman only, Latin subset. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("./assets/fonts/fraunces-latin-opsz-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2")
+    format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope-latin-wght-normal.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Palette B (owner, 2026-11-24) and the type roles. */
+@theme {
+  --color-sky: #7cc2ec;
+  --color-sky-hover: #9ad2f2;
+  --color-ink: #0f172a;
+  --color-night: #0b1530;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-num: "Manrope", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --ease-out-soft: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Colours by role. Light and dark are designed separately (surfaces get lighter as they rise in dark mode), not
+   inverted. The dark block is written twice: once for `.dark` (JavaScript on) and once for the device setting with
+   JavaScript off; keep the two identical. */
+:root {
+  --surface: #f8fafc;
+  --surface-2: #ffffff;
+  --surface-3: #eef2f8;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --heading: #1e3a8a;
+  --line: #dbe3ef;
+  --primary: #1e3a8a;
+  --primary-hover: #172e6e;
+  --on-primary: #ffffff;
+  --accent: #1e3a8a;
+  --pastel-blue: #dceefb;
+  --pastel-lavender: #cfceff;
+  --pastel-mint: #d5f1e6;
+  --on-pastel: #1e3a8a;
+  --glass: rgb(255 255 255 / 0.78);
+  --glass-solid: #ffffff;
+  --glass-edge: rgb(15 23 42 / 0.08);
+  --focus: #1e3a8a;
+  --hero-from: #0b1530;
+  --hero-to: #1e3a8a;
+  --step-dark: #1e3a8a;
+  --frame-screen: #ffffff;
+  --privacy-bg: #0b1530;
+}
+.dark {
+  --surface: #0b1530;
+  --surface-2: #111d3f;
+  --surface-3: #17264f;
+  --text: #e6edf7;
+  --text-muted: #a8b6ce;
+  --heading: #f1f5fb;
+  --line: #22325c;
+  --primary: #7cc2ec;
+  --primary-hover: #9ad2f2;
+  --on-primary: #0b1530;
+  --accent: #7cc2ec;
+  --pastel-blue: #1b2d57;
+  --pastel-lavender: #27295a;
+  --pastel-mint: #153a3a;
+  --on-pastel: #e6edf7;
+  --glass: rgb(17 29 63 / 0.7);
+  --glass-solid: #111d3f;
+  --glass-edge: rgb(255 255 255 / 0.1);
+  --focus: #7cc2ec;
+  --hero-from: #050c1f;
+  --hero-to: #14275e;
+  --step-dark: #1d3a7a;
+  --frame-screen: #0b1120;
+  --privacy-bg: #050c1f;
+}
+@media (prefers-color-scheme: dark) {
+  html:not(.js) {
+    --surface: #0b1530;
+    --surface-2: #111d3f;
+    --surface-3: #17264f;
+    --text: #e6edf7;
+    --text-muted: #a8b6ce;
+    --heading: #f1f5fb;
+    --line: #22325c;
+    --primary: #7cc2ec;
+    --primary-hover: #9ad2f2;
+    --on-primary: #0b1530;
+    --accent: #7cc2ec;
+    --pastel-blue: #1b2d57;
+    --pastel-lavender: #27295a;
+    --pastel-mint: #153a3a;
+    --on-pastel: #e6edf7;
+    --glass: rgb(17 29 63 / 0.7);
+    --glass-solid: #111d3f;
+    --glass-edge: rgb(255 255 255 / 0.1);
+    --focus: #7cc2ec;
+    --hero-from: #050c1f;
+    --hero-to: #14275e;
+    --step-dark: #1d3a7a;
+    --frame-screen: #0b1120;
+    --privacy-bg: #050c1f;
+  }
+}
+
+@theme inline {
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-heading: var(--heading);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-pastel-blue: var(--pastel-blue);
+  --color-pastel-lavender: var(--pastel-lavender);
+  --color-pastel-mint: var(--pastel-mint);
+  --color-on-pastel: var(--on-pastel);
+  --color-step-dark: var(--step-dark);
+  --color-frame-screen: var(--frame-screen);
+  --color-privacy: var(--privacy-bg);
+}
+
+@layer base {
+  /*
+    Proportional scaling with no ceiling (owner, 2026-11-26). Up to 1440px wide the root is the visitor's own font
+    size (100%), so browser zoom and text-size settings work in full. Wider than that, the root grows with the screen
+    (about 1.8x at 3840px, 3.6x at 7680px), and because every size is in rem, the page keeps the same proportions on
+    a 4K monitor or a TV. 50% + 0.556vw equals 100% (16px) at 1440px. Trade-off: on very wide screens browser zoom
+    has a smaller effect, since part of the size follows the screen width.
+  */
+  html {
+    font-size: max(100%, calc(50% + 0.556vw));
+    background: var(--surface);
+    color: var(--text);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Keep focused and linked-to content clear of the fixed header and, on phones, the fixed bottom bar (WCAG 2.4.11). */
+    scroll-padding-top: 6rem;
+    scroll-padding-bottom: 1rem;
+  }
+  @media (max-width: 47.99rem) {
+    html.js {
+      scroll-padding-bottom: 6rem;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--surface);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    overflow-wrap: break-word;
+  }
+  img,
+  svg {
+    max-width: 100%;
+  }
+  /* A focus ring everywhere, without changing the element's shape (rounded pills stay pills). */
+  :focus-visible {
+    outline: 0.125rem solid var(--focus);
+    outline-offset: 0.1875rem;
+  }
+  /* The JavaScript-only controls (theme switch, swipe buttons, bottom bar) are hidden when JavaScript is off. */
+  html:not(.js) .js-only {
+    display: none !important;
+  }
+}
+
+/* Inside the always-dark areas (hero, privacy band, call-to-action card, header over the hero) the ring is sky; on
+   light pills inside them it goes back to the theme's colour. Sky on navy is 5.3:1, navy on white 10.4:1. */
+.on-dark {
+  --focus: #7cc2ec;
+}
+.on-glass {
+  --focus: var(--primary);
+}
+
+.ld-noscript {
+  margin: 0;
+  padding: 0.75rem 1.25rem;
+  background: #fff7d6;
+  color: #3d2f00;
+  font: 500 0.95rem/1.5 var(--font-sans);
+  text-align: center;
+}
+
+/* Glass, used sparingly: the header pill and the phone bottom bar. Solid where backdrop blur is not supported. */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(1rem) saturate(1.4);
+  backdrop-filter: blur(1rem) saturate(1.4);
+  box-shadow:
+    inset 0 0 0 0.0625rem var(--glass-edge),
+    0 0.625rem 1.875rem -0.75rem rgb(15 23 42 / 0.25);
+}
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glass {
+    background: var(--glass-solid);
+  }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────────
+   The default (no JavaScript, or scrolled) is the merged, readable pill. With JavaScript, while the page is at the very
+   top, it splits apart over the dark hero (`data-at-top`, set by components/Header.tsx). */
+.ld-header-bar {
+  --hdr-fg: var(--text);
+}
+html.js .ld-header[data-at-top="true"] .ld-header-bar {
+  --hdr-fg: #ffffff;
+  --focus: #7cc2ec; /* sky ring over the dark hero */
+  /* Almost the hero's own colour, so the split header still blends into it, but solid enough that the white text keeps
+     its contrast whatever is behind (and contrast checkers, which cannot see through to the hero, agree). */
+  background: color-mix(in srgb, var(--hero-from) 85%, transparent);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (min-width: 64rem) {
+  .ld-header-bar {
+    max-width: 68rem;
+  }
+  html.js .ld-header[data-at-top="true"] .ld-header-bar {
+    max-width: 85rem;
+  }
+  /* Over the hero the links sit on their own light pill so they stay readable. */
+  html.js .ld-header[data-at-top="true"] .ld-header-nav {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(1rem);
+    backdrop-filter: blur(1rem);
+    box-shadow: inset 0 0 0 0.0625rem var(--glass-edge);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ld-header-bar {
+    transition:
+      max-width 0.4s var(--ease-in-out-soft),
+      background-color 0.4s var(--ease-in-out-soft),
+      box-shadow 0.4s var(--ease-in-out-soft);
+  }
+}
+
+/* The phone and tablet menu is a native <details>, so it opens without JavaScript and screen readers announce it as an
+   expandable button. */
+.ld-menu > summary {
+  list-style: none;
+}
+.ld-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ── Hero: the full-width hero becomes an inset rounded card as the page scrolls ─────
+   Uses `transform` and `clip-path` (cheaper to animate than border-radius). Tied to the first 26rem of page scroll;
+   static where scroll-driven animations are unsupported (older Safari and Firefox) or motion is reduced. */
+@keyframes ld-hero-shrink {
+  from {
+    transform: scale(1);
+    clip-path: inset(0 0 0 0 round 0 0 0 0);
+  }
+  to {
+    transform: scale(0.94);
+    clip-path: inset(0 0 0 0 round 0 0 3rem 3rem);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ld-hero-card {
+      transform-origin: 50% 0;
+      animation: ld-hero-shrink linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 26rem;
+    }
+  }
+}
+
+/* ── Reveal on scroll (CSS only; content is visible wherever this is unsupported) ── */
+@keyframes ld-reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.75rem) scale(0.985);
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ld-reveal {
+      animation: ld-reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 45%;
+    }
+  }
+}
+
+/* ── Feature story ──────────────────────────────────────────────────────────────
+   Three layouts from one list (components/FeatureStory.tsx):
+   1. Default (no JavaScript, or a mouse on a narrow screen): stacked blocks, each with its own screenshot.
+   2. Touch screens narrower than 64rem: a horizontal swipe strip with scroll snapping (works without JavaScript).
+   3. Wide screens with JavaScript: text scrolls on the left while one sticky screenshot on the right follows it. */
+.ld-story-sticky {
+  display: none;
+}
+@media (min-width: 64rem) {
+  html.js .ld-story-sticky {
+    display: block;
+  }
+  html.js .ld-story-inline {
+    display: none;
+  }
+  html.js .ld-story-item {
+    min-height: 70vh;
+    min-height: 70svh;
+  }
+}
+@media (pointer: coarse) and (max-width: 63.99rem) {
+  .ld-story-list {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 1.5rem;
+    padding-inline: 1.5rem;
+    margin-inline: -1.5rem;
+    padding-bottom: 1rem;
+    scrollbar-width: thin;
+  }
+  .ld-story-item {
+    flex: 0 0 85%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}
+@media not ((pointer: coarse) and (max-width: 63.99rem)) {
+  .ld-swipe-controls {
+    display: none !important;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ld-story-layer {
+    transition:
+      opacity 0.55s var(--ease-out-soft),
+      transform 0.55s var(--ease-out-soft);
+  }
+}
+
+/* ── Step cards stack (sticky at 5, 6 and 7rem) only where a whole card fits on screen ── */
+@media (min-height: 46rem) {
+  .ld-step {
+    position: sticky;
+  }
+}
+
+/* ── Phone bottom bar: padded clear of the home indicator ───────────────────────── */
+.ld-bottom-bar {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ld-bottom-bar {
+    transition:
+      transform 0.3s var(--ease-out-soft),
+      opacity 0.3s var(--ease-out-soft);
+  }
+}
+
+/* Tabular figures for the step numbers (Manrope supports them; checked 2026-11-25). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced motion, the backstop: anything that still animates or transitions is stopped. Scroll-driven effects above
+   are already off under this setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
