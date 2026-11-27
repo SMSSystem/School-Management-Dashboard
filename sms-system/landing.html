@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  The public landing page (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). Built only when VITE_LANDING_ENABLED is
+  "true"; the build then renders src/landing/LandingPage.tsx into the comment below and writes this file as
+  dist/index.html, the page Vercel serves at `/` (scripts/landingBuild.mjs). With the flag on, `npm run dev` serves it at
+  `/` too and renders it in the browser instead. Comments in this file are removed from the built page.
+
+  Nothing here may load Firebase, reCAPTCHA or the app's code: the page has to stay small, private and fast.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover lets the fixed bottom bar pad itself clear of the home indicator (env(safe-area-inset-*)). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Not indexed until launch; remove at launch (LANDING_PAGE_SPEC.md, launch checklist). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0b1530" />
+    <meta name="description" content="Attendance, grades, report cards and exams for schools, in one place." />
+    <title>Scholarch: run your whole school from one place</title>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- The two faces used above the fold; Vite rewrites these paths to the hashed files. -->
+    <link rel="preload" href="/src/landing/assets/fonts/fraunces-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/landing/assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <!--
+      Runs before the first paint (a classic, blocking script on purpose): marks the page as having JavaScript, applies
+      the saved theme, and sends a signed-in visitor to the app. An external file, so a strict
+      Content-Security-Policy (script-src 'self') allows it.
+    -->
+    <script src="/landing-boot.js"></script>
+  </head>
+  <body>
+    <noscript>
+      <p class="ld-noscript">
+        JavaScript is turned off. Everything on this page still works: the colours follow your device's light or dark
+        setting, and the menu opens with a tap.
+      </p>
+    </noscript>
+    <div id="landing-root"><!--landing-prerender--></div>
+    <script type="module" src="/src/landing/main.tsx"></script>
+  </body>
+</html>

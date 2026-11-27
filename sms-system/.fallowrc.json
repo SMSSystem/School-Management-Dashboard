@@ -11,7 +11,12 @@
     "rules-tests/**/*.ts",
     "e2e/**/*.ts",
     // The service worker: vite-plugin-pwa builds it from vite.config.ts, and nothing imports it.
-    "src/sw.ts"
+    "src/sw.ts",
+    // The public landing page: landing.html loads main.tsx, and scripts/landingBuild.mjs renders entry-server.tsx at
+    // build time (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). Neither is imported by the app.
+    "src/landing/main.tsx",
+    "src/landing/entry-server.tsx",
+    "playwright.landing.config.ts"
   ],
 
   "ignorePatterns": [
@@ -27,7 +32,8 @@
     "src/lib/__tests__/examImportBundle.test.ts",
     "src/lib/__tests__/mockDataIsDevOnly.test.ts",
     "src/lib/__tests__/queryPolicies.test.ts",
-    "src/lib/__tests__/sourceBytes.test.ts"
+    "src/lib/__tests__/sourceBytes.test.ts",
+    "src/landing/__tests__/landingContent.test.ts"
   ],
 
   // Advisory: these are reported but do not produce a failing verdict.

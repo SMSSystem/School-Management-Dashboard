@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import viteConfigRaw from '../../../vite.config.ts?raw';
 import nextAdapterRaw from '../../../node_modules/nextstepjs/dist/adapters/next/index.js?raw';
 import { useRouter, usePathname, useSearchParams, useParams } from '../nextNavigationMock';
+import { flat } from './sourceText';
 
 // nextstepjs's Next.js adapter imports useRouter and usePathname from `next/navigation`. The app uses the React Router
 // adapter, but the production build still resolves that import: without the alias in vite.config.ts it fails with
@@ -14,8 +15,11 @@ describe('the next/navigation stub', () => {
   });
 
   it('is aliased in vite.config.ts', () => {
-    const config = viteConfigRaw.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
-    expect(config).toContain("'next/navigation': path.resolve(__dirname, 'src/lib/nextNavigationMock.ts'),");
+    // Compared through flat() so quote style and Prettier's line wrapping do not matter (no trailing comma: it is
+    // the last alias, where Prettier may drop it).
+    expect(flat(viteConfigRaw)).toContain(
+      flat("'next/navigation': path.resolve(__dirname, 'src/lib/nextNavigationMock.ts')"),
+    );
   });
 
   it('exports what the adapter asks for', () => {

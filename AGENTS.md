@@ -54,6 +54,10 @@ When the owner asks you to open a pull request, or to get one ready:
 
 5. **Run `npm test`.** It includes `versionConsistency.test.ts`. Then tell the owner the new version.
 
+### Landing page launch
+
+The pull request that switches on the public landing page (sets `VITE_LANDING_ENABLED` for production, removes its `noindex`, or otherwise takes it live) must carry the **Launch checklist** from [sms-system/docs/miscellaneous-specs/LANDING_PAGE_SPEC.md](sms-system/docs/miscellaneous-specs/LANDING_PAGE_SPEC.md) in its description, every item ticked or marked skipped with a reason.
+
 ### Pull request titles
 
 - Every pull request title starts with `SMS-<number> | `, with at least three digits, for example `SMS-001 | Feature Implementation: Backend Integration, Caching Rewrite, & Documentation Updates`.

@@ -38,6 +38,20 @@ const OFFLINE_MODULES: readonly (string | RegExp)[] = [
   /^node_modules\/(?:@firebase|firebase)\/database\/.*\.js$/,
 ];
 
+/**
+ * The app shell. The build always writes it twice: as `index.html` and as `app.html` (scripts/landingBuild.mjs).
+ * Page loads inside the app are answered with `app.html` (src/sw.ts), so they keep working when the landing page
+ * takes over `index.html` (VITE_LANDING_ENABLED, docs/miscellaneous-specs/LANDING_PAGE_SPEC.md).
+ */
+export const APP_SHELL = "app.html";
+
+/**
+ * The landing page's HTML entry in Vite's build manifest; present only when VITE_LANDING_ENABLED is "true". Its
+ * JavaScript is not kept (the page is prerendered and reads fine without it); its stylesheet is, so `/` still looks
+ * right when it is opened offline.
+ */
+export const LANDING_ENTRY = "landing.html";
+
 /** Files from `public/` kept too: the lock screen and the sign-in page show the logo, and the tab its icon. */
 export const PUBLIC_FILES = [
   "logo.png",
@@ -58,7 +72,7 @@ function keysFor(manifest: ViteManifest, root: string | RegExp): string[] {
 }
 
 /**
- * The files to keep: the HTML entry and the offline modules, each with everything they import statically
+ * The files to keep: the app's HTML entry and the offline modules, each with everything they import statically
  * (recursively) and their CSS, plus PUBLIC_FILES. Anything else reached only through a dynamic import is left out.
  * Throws when the entry or a module is missing, so a renamed page fails the build instead of silently not working
  * offline.
@@ -79,11 +93,16 @@ export function selectPrecache(
     for (const css of chunk.css ?? []) files.add(css);
     for (const imported of chunk.imports ?? []) visit(imported);
   };
-  const entries = Object.keys(manifest).filter((key) => manifest[key].isEntry);
+  const entries = Object.keys(manifest).filter(
+    (key) => manifest[key].isEntry && key !== LANDING_ENTRY,
+  );
   if (entries.length === 0)
     throw new Error("precache: the build manifest has no entry");
   entries.forEach(visit);
   for (const root of offlineModules) keysFor(manifest, root).forEach(visit);
+  for (const css of manifest[LANDING_ENTRY]?.css ?? []) files.add(css);
+  // `/` (the app, or the landing page when it is on) and the app shell every other page load is answered with.
   files.add("index.html");
+  files.add(APP_SHELL);
   return files;
 }

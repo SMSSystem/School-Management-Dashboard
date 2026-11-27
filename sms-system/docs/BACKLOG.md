@@ -94,6 +94,26 @@ The first offline release keeps a teacher's unsent work safe when the connection
 - **Why it waits:** toasts sit above dialogs today (the connection banner has sat below them since v2.57.0) and would end up behind an open one, so each flow that shows a toast while a dialog is open needs checking. Tests that pin dialog source need updating with the same checks.
 - **Starts when:** next, as its own pull request. The owner kept it out of the "You're leaving" dialog work (v2.63.0), which is built on today's `DialogShell`.
 
+### Fallback when the "You're leaving" dialog fails to load
+
+- **What:** `OutsideLink` loads the "You're leaving" dialog only when a checked link is clicked (since v2.64.0, to keep Firebase off public pages). If that download fails, for example offline or just after a deploy, the page's error screen shows instead. Catch the failure and open the link directly, as an unchecked link does.
+- **Why it waits:** only lesson-note links and Settings use the check, and neither works offline, so a failure is rare.
+- **Starts when:** together with "Move confirm dialogs to the top layer", which changes the same dialog, or when someone reports the error screen after clicking a link.
+
+## Accessibility
+
+### Reduced motion across the whole app
+
+- **What:** check every transition and animation outside the landing page (modals, tours, toasts, loaders, sidebar) so each runs only when the device allows motion (`prefers-reduced-motion: no-preference`, or Tailwind's `motion-safe:`), add a final rule that stops anything left, and add an end-to-end check with reduced motion on. The landing page already does all of this (`src/landing/landing.css`).
+- **Why it waits:** the landing page came first; the app has many more screens, and each change needs its own check and review.
+- **Starts when:** the accessibility lint (`eslint-plugin-jsx-a11y-x`, now on `src/landing/**` only) is widened to the rest of the app, or someone reports trouble with motion.
+
+### Feature list tab stop on desktop
+
+- **What:** on the landing page the feature list (`src/landing/components/FeatureStory.tsx`) is always focusable (`tabIndex={0}`) so touch-phone users can scroll it sideways with the arrow keys. On desktop it does not scroll, so it is an extra, empty tab stop. Make it focusable only in the swipe layout.
+- **Why it waits:** it does not block anyone, and the landing page is not live yet.
+- **Starts when:** before the landing page goes live (it is on the launch checklist in `docs/miscellaneous-specs/LANDING_PAGE_SPEC.md`).
+
 ## Security
 
 ### Tighten access to large-file storage and its usage counters

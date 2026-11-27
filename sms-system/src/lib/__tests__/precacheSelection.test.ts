@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_SHELL,
+  LANDING_ENTRY,
   PUBLIC_FILES,
   REGISTER_MODULES,
   selectPrecache,
@@ -94,6 +96,32 @@ describe("selectPrecache", () => {
       "assets/subject-extra.js",
     ])
       expect(keep.has(file), file).toBe(false);
+  });
+
+  it("keeps `/` and the app shell copy every app page load is answered with", () => {
+    const keep = selectPrecache(manifest);
+    expect(APP_SHELL).toBe("app.html");
+    expect(keep.has("index.html")).toBe(true);
+    expect(keep.has("app.html")).toBe(true);
+  });
+
+  it("keeps only the landing page's stylesheet, never its code, when the landing page is built", () => {
+    const withLanding: ViteManifest = {
+      ...manifest,
+      [LANDING_ENTRY]: {
+        file: "assets/landing.js",
+        src: LANDING_ENTRY,
+        isEntry: true,
+        imports: ["_landing-react.js"],
+        css: ["assets/landing.css"],
+      },
+      "_landing-react.js": { file: "assets/landing-react.js" },
+    };
+    const keep = selectPrecache(withLanding);
+    expect(keep.has("assets/landing.css")).toBe(true);
+    expect(keep.has("assets/landing.js")).toBe(false);
+    expect(keep.has("assets/landing-react.js")).toBe(false);
+    expect(keep.has("assets/index-main.js")).toBe(true);
   });
 
   it("keeps the logo and the icons", () => {

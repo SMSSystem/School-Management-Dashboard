@@ -15,6 +15,8 @@ try {
 
 export default defineConfig({
   testDir: './e2e',
+  // The landing page has its own config (playwright.landing.config.ts): a production build, no Firebase.
+  testIgnore: ['landing/**'],
   fullyParallel: false, // shared live Firestore project — avoid cross-test races
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
