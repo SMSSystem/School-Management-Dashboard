@@ -2,9 +2,7 @@ import { ArrowUpRight } from "lucide-react";
 import Genr8Logo from "@/components/Genr8Logo";
 import OutsideLink from "@/components/OutsideLink";
 import { BUILD_YEAR, buildDescription, displayVersion } from "@/lib/appVersion";
-
-const DEMO_URL = "https://sms-demo.solutions.genr83d.com/";
-const DESIGNER_URL = "https://solutions.genr83d.com/";
+import { DEMO_URL, DESIGNER_URL, OPERATOR_NAME } from "@/lib/publicLinks";
 
 // 44px tap targets on phones, natural height from md up (as on the demo site).
 const LINK = "inline-flex min-h-11 md:min-h-0 items-center gap-1 rounded hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400";
@@ -17,7 +15,7 @@ const PublicFooter = ({ className = "" }: { className?: string }) => (
   <footer className={`px-4 py-4 text-xs text-slate-500 ${className}`}>
     <div className="mx-auto flex max-w-5xl flex-col-reverse items-center gap-y-2 sm:flex-row sm:justify-between sm:gap-x-4">
       <p className="flex flex-wrap items-center justify-center gap-x-2">
-        <span>© {BUILD_YEAR} GENR8-3D Digital Solutions</span>
+        <span>© {BUILD_YEAR} {OPERATOR_NAME}</span>
         <span aria-hidden="true">·</span>
         {/* Same text and build tooltip as AppVersionTag, inline and in the footer's colour. */}
         <span title={buildDescription()}>{displayVersion()}</span>
@@ -34,7 +32,7 @@ const PublicFooter = ({ className = "" }: { className?: string }) => (
         <span aria-hidden="true" className="hidden sm:inline">·</span>
         <OutsideLink
           href={DESIGNER_URL}
-          ariaLabel="Designed by GENR8-3D Digital Solutions (opens in a new tab)"
+          ariaLabel={`Designed by ${OPERATOR_NAME} (opens in a new tab)`}
           className={`${LINK} gap-2`}
         >
           <span>Designed by</span>

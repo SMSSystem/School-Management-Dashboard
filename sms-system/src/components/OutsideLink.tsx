@@ -1,10 +1,14 @@
-import { useState, type MouseEvent, type ReactNode } from "react";
-import LeavingDialog from "@/components/LeavingDialog";
+import { lazy, Suspense, useState, type MouseEvent, type ReactNode } from "react";
 import {
   leavingText,
   shouldConfirmLeaving,
   type LeavingSource,
 } from "@/lib/outsideLinks";
+
+// Loaded only when a `leaving` link is clicked. The dialog reads the signed-in site name (hooks/useSiteName.ts ->
+// AuthContext -> Firebase), so a static import would put Firebase into every page that shows an outside link,
+// including the public landing page (src/landing/), which must never load it.
+const LeavingDialog = lazy(() => import("@/components/LeavingDialog"));
 
 // Every link to another site goes through this component, so they all open in a new tab cut off from this page
 // (rel="noopener noreferrer"), and screen readers hear that they open a new tab. Add new outside links here, never as a
@@ -57,11 +61,13 @@ export default function OutsideLink({
         {!ariaLabel && <span className="sr-only"> {leavingText.newTab}</span>}
       </a>
       {asking && leaving && (
-        <LeavingDialog
-          url={href}
-          source={leaving}
-          onClose={() => setAsking(false)}
-        />
+        <Suspense fallback={null}>
+          <LeavingDialog
+            url={href}
+            source={leaving}
+            onClose={() => setAsking(false)}
+          />
+        </Suspense>
       )}
     </>
   );
