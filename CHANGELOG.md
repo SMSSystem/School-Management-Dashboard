@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.62.0 · **Last updated:** 2026-11-26
+**Current version:** v2.63.0 · **Last updated:** 2026-11-26
 
 ## Unreleased
 
@@ -10,8 +10,23 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.62.0"></a>
+<a id="v2.63.0"></a>
 <details open>
+<summary><strong>v2.63.0</strong> · 2026-11-26 · You're Leaving Check for Outside Links (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/126">#126</a>)</summary>
+
+**Added**
+
+- Opening a link that a teacher added to a lesson note now first shows a **You're leaving** check, with the full address and a note that teachers add these links and the app doesn't check them. **Continue to site** opens it in a new tab; **Go back** stays. The changelog link in Settings asks the same way.
+
+**Fixed**
+
+- The changelog link in Settings now opens with the same new-tab protection as every other outside link.
+- The email link on the institution profile now handles addresses with unusual characters.
+
+</details>
+
+<a id="v2.62.0"></a>
+<details>
 <summary><strong>v2.62.0</strong> · 2026-11-26 · Lock Button for Offline Staff (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/125">#125</a>)</summary>
 
 **Added**

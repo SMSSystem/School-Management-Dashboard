@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDeviceOnline } from "@/hooks/useDeviceOnline";
+import { useSiteName } from "@/hooks/useSiteName";
 import {
   MAX_UNLOCK_FAILURES,
   afterPasswordCheck,
@@ -177,6 +178,7 @@ function SignOutChoice({
 
 export default function IdleLockScreen({ uid }: { uid: string }) {
   const { displayName, institution } = useAuth();
+  const siteName = useSiteName();
   const online = useDeviceOnline();
   const leave = useLeave();
   const canUnlock = hasVerifier(uid);
@@ -200,9 +202,7 @@ export default function IdleLockScreen({ uid }: { uid: string }) {
             className="w-10 h-10 object-contain"
           />
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">
-              {institution?.name ?? "School Management"}
-            </p>
+            <p className="text-sm font-semibold truncate">{siteName}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
               {displayName}
             </p>

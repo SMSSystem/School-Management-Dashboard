@@ -3,6 +3,8 @@
 // BrowserRouter, which cannot block a navigation, so a page that is dirty asks itself by watching clicks on links and the
 // back button; the listeners live in the guard's provider, the rules live here so they can be tested without a browser.
 
+import { parseWebUrl } from './webUrl';
+
 export type LinkClick = {
   button: number;
   ctrlKey: boolean;
@@ -29,13 +31,8 @@ export function interceptTarget(click: LinkClick, here: Here): string | null {
   if (click.defaultPrevented || click.button !== 0) return null;
   if (click.ctrlKey || click.metaKey || click.shiftKey || click.altKey || click.download) return null;
   if (click.target !== '' && click.target !== '_self') return null;
-  let url: URL;
-  try {
-    url = new URL(click.href);
-  } catch {
-    return null;
-  }
-  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.origin !== here.origin) return null;
+  const url = parseWebUrl(click.href);
+  if (!url || url.origin !== here.origin) return null;
   if (url.pathname + url.search === here.path) return null;
   return url.pathname + url.search + url.hash;
 }

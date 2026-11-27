@@ -47,7 +47,7 @@ export function InstitutionInfoDisplay() {
           </a>
         )}
         {institution.email && (
-          <a href={`mailto:${institution.email}`} className={rowClass}>
+          <a href={`mailto:${encodeURI(institution.email)}`} className={rowClass}>
             <span className={iconWrap}>
               <Mail className="h-4 w-4" aria-hidden="true" />
             </span>

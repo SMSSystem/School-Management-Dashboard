@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import Genr8Logo from "@/components/Genr8Logo";
+import OutsideLink from "@/components/OutsideLink";
 import { BUILD_YEAR, buildDescription, displayVersion } from "@/lib/appVersion";
 
 const DEMO_URL = "https://sms-demo.solutions.genr83d.com/";
@@ -22,26 +23,23 @@ const PublicFooter = ({ className = "" }: { className?: string }) => (
         <span title={buildDescription()}>{displayVersion()}</span>
       </p>
       <nav aria-label="About this system" className="flex flex-col items-center sm:flex-row sm:gap-x-2">
-        <a
+        {/* Fixed addresses of our own, so no "You're leaving" check (components/OutsideLink.tsx). */}
+        <OutsideLink
           href={DEMO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Try the demo (opens in a new tab)"
+          ariaLabel="Try the demo (opens in a new tab)"
           className={`${LINK} font-medium text-slate-600 underline-offset-2 hover:underline`}
         >
           Try the demo <ArrowUpRight className="size-3.5" aria-hidden="true" />
-        </a>
+        </OutsideLink>
         <span aria-hidden="true" className="hidden sm:inline">·</span>
-        <a
+        <OutsideLink
           href={DESIGNER_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Designed by GENR8-3D Digital Solutions (opens in a new tab)"
+          ariaLabel="Designed by GENR8-3D Digital Solutions (opens in a new tab)"
           className={`${LINK} gap-2`}
         >
           <span>Designed by</span>
           <Genr8Logo className="h-6 w-auto" />
-        </a>
+        </OutsideLink>
       </nav>
     </div>
   </footer>

@@ -5,6 +5,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 import { useLessonNoteDownloadAll } from "@/hooks/useLessonNoteDownloadAll";
 import DownloadAllPanel from "./lessonNote/DownloadAllPanel";
+import OutsideLink from "@/components/OutsideLink";
 import { downloadLessonNoteAttachment } from "@/lib/lessonNoteAttachment";
 import { formatFileSize, needsBlobStore } from "@/lib/documentUpload";
 import { validateLessonNoteUrl } from "@/lib/lessonNoteLinks";
@@ -167,17 +168,17 @@ export const LessonNoteViewDialog = ({
               {note.resourceLinks.map((link, i) => (
                 <li key={i} className="text-sm">
                   {/* Re-validated at render: a link written around the form
-                      (e.g. javascript:) is shown as inert text, never an anchor. */}
+                      (e.g. javascript:) is shown as inert text, never an anchor.
+                      A teacher typed it, so following it asks first. */}
                   {validateLessonNoteUrl(link.url) === null ? (
-                    <a
+                    <OutsideLink
                       href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      leaving="lesson-note"
                       className="flex min-h-11 md:min-h-0 items-center justify-between gap-2 rounded-lg md:rounded-none border border-gray-200 dark:border-gray-700 md:border-0 px-3 md:px-0 py-2 md:py-0 text-sky-700 dark:text-sky-400 hover:underline break-all"
                     >
                       <span className="min-w-0">{link.label || link.url}</span>
-                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                    </a>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    </OutsideLink>
                   ) : (
                     <span className="text-gray-500 break-all">{link.label || link.url}</span>
                   )}

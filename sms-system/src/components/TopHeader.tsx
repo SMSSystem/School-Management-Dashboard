@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useLogout } from "@/hooks/useLogout";
 import HeaderOutbox from "@/components/attendance/HeaderOutbox";
 import LockButton from "@/components/LockButton";
+import { useSiteName } from "@/hooks/useSiteName";
 import { getRoleLabel } from "@/lib/firebase";
 import { toggleTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { Sun, Moon, LogOut, Menu as MenuIcon } from "lucide-react";
@@ -25,9 +26,7 @@ export default function TopHeader({
 
   const isSuperAdmin = role === "super_admin";
   const logoUrl = isSuperAdmin ? null : (institution?.logoUrl ?? null);
-  const siteName = isSuperAdmin
-    ? "School Management"
-    : (institution?.name ?? "School Management");
+  const siteName = useSiteName();
   const nameLabel = displayName ?? user?.email ?? "—";
 
   const { handleLogout, askSignOut, cancelSignOut, signOutNow } = useLogout();

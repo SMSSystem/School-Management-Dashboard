@@ -203,7 +203,7 @@ No new validation code — `processDocumentUpload()` / `sniffDocumentType()` in 
 
 **Form fields (create/edit modal):** `name` (required), class picker (optional, via the existing `useInstitutionClasses()` hook), subject picker (optional, via `useInstitutionSubjects()`), one file input (reusing `documentUpload.ts`), a repeatable URL+label list (add/remove rows, each validated per §9 of this spec's sibling concern — see note below).
 
-**URL validation (client-side, at minimum):** `new URL(input)` (rejects malformed strings), restrict to `http:`/`https:` protocols only (blocks `javascript:`/`data:`/`vbscript:`), render every link as `<a href={url} target="_blank" rel="noopener noreferrer">` — never `iframe`-embedded, never fetched/previewed server-side (no Cloud Functions exist in this project to do that with anyway).
+**URL validation (client-side, at minimum):** `new URL(input)` (rejects malformed strings), restrict to `http:`/`https:` protocols only (blocks `javascript:`/`data:`/`vbscript:`), render every link as `<a href={url} target="_blank" rel="noopener noreferrer">` — never `iframe`-embedded, never fetched/previewed server-side (no Cloud Functions exist in this project to do that with anyway). Since v2.63.0 links render through `components/OutsideLink.tsx` with `leaving="lesson-note"`: following one (a click, a modifier click or a middle click) first shows the "You're leaving" dialog with the full address and "A teacher added this link. We don't check what's on it." The right-click menu and dragging still get past; the dialog is a check, not a wall.
 
 ---
 
@@ -247,7 +247,7 @@ Review before building found defects in the §5 pseudocode and left several prod
 1. **Attachment create/update uses `getAfter()`** on the parent note. `get()` sees pre-write state, so creating a note and its file in one batch would have been denied.
 2. **Parent read requires a class** (`'classId' in n && n.classId != null`), on both the note and the file. The §5 draft's bare `isParent()` exposed subject-only notes (contradicting decision 5).
 3. **Ownership fields are frozen on update:** `teacherId`, `teacherRole`, `departmentId`, `institutionId`, `createdBy`, `createdByRole`, `createdAt`. Creators can't claim another role in `teacherRole` or a department that isn't theirs.
-4. **Shape validation on create/update:** `hasOnly` key list, non-empty `name` (≤150), `resourceLinks` is a list of ≤10, `createdAt`/`updatedAt` equal `request.time`, and **a note must have a file or at least one link**. Per-link http/https validation stays client-side (rules cannot loop), re-checked at render.
+4. **Shape validation on create/update:** `hasOnly` key list, non-empty `name` (≤150), `resourceLinks` is a list of ≤10, `createdAt`/`updatedAt` equal `request.time`. (The draft required a file or at least one link; the rules as deployed make both optional, so a note can be a name only.) Per-link http/https validation stays client-side (rules cannot loop), re-checked at render.
 5. **Senior teachers** (narrow rule) may also replace the file, matching their edit right.
 6. **Delete:** the author, an admin, or a senior teacher on a same-department regular teacher's note (was admin-only). Delete is one batch removing the note and its `attachment/data` document — Firestore does not cascade. Admins can also delete an orphaned file document.
 

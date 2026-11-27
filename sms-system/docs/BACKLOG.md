@@ -88,19 +88,11 @@ The first offline release keeps a teacher's unsent work safe when the connection
 - **Why it waits:** it is most useful alongside the offline outbox, which changes what counts as unsaved. Pages that join the guard also each need testing.
 - **Starts when:** the outbox's first phase starts, or lost edits are reported sooner.
 
-### "You're leaving" dialog for outside links
-
-- **What:** a dialog before following two kinds of link: teacher-entered links on lesson notes, and the changelog link in Settings. The public footer links, email and phone links, and downloads are exempt.
-- **Draft wording:** title "You're leaving [site name]", where the site name is the one in the top bar. Body "This link goes to a site outside [site name]. Make sure you trust it before continuing." Then the full address in a code-style box, and the buttons "Continue to site" and "Go back", with focus on Go back. Lesson-note links add "A teacher added this link. We don't check what's on it." No warning about scams, because that wouldn't be true here.
-- **Limits:** middle-click and Ctrl-click can get past a click handler. The address shown should make lookalike sites easier to spot, but it doesn't check them.
-- **Why it waits:** there are only two kinds of link, and lesson-note links already accept only `http` and `https`, so the risk is modest.
-- **Starts when:** the owner schedules it, or with the move of confirm dialogs to the top layer below.
-
 ### Move confirm dialogs to the top layer
 
-- **What:** change the shared `DialogShell` to a native `<dialog>` opened with `showModal()`, so every `ConfirmDialog`, the unsaved-changes prompt and the "You're leaving" dialog sit above everything and make the page behind them inert. `FormModal` stays as it is for now.
+- **What:** change the shared `DialogShell` to a native `<dialog>` opened with `showModal()`, so every `ConfirmDialog`, the unsaved-changes prompt and the "You're leaving" dialog (`components/LeavingDialog.tsx`) sit above everything and make the page behind them inert. `FormModal` stays as it is for now.
 - **Why it waits:** toasts sit above dialogs today (the connection banner has sat below them since v2.57.0) and would end up behind an open one, so each flow that shows a toast while a dialog is open needs checking. Tests that pin dialog source need updating with the same checks.
-- **Starts when:** work starts on the "You're leaving" dialog or the refresh confirmation.
+- **Starts when:** next, as its own pull request. The owner kept it out of the "You're leaving" dialog work (v2.63.0), which is built on today's `DialogShell`.
 
 ## Security
 

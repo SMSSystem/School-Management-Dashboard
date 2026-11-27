@@ -367,7 +367,7 @@ The Schedule page shows a weekly timetable view.
 Lesson Notes are the teaching material (a file and/or links) that teachers share with a class. In the sidebar, click **Lessons**; the page is titled **Lesson Notes**. As an Institution Administrator you see every note in the institution and can create, edit or delete any of them.
 
 1. Click **+**, enter a name, and optionally tick the subjects (up to 5) and the classes (up to 20).
-2. Optionally add **up to 12 files** (5 MB each, 15 MB in total) and up to 10 links. A bar shows how much of the 15 MB you have used. If you choose more than fit, the form adds what it can and names the files it left out.
+2. Optionally add **up to 12 files** (5 MB each, 15 MB in total) and up to 10 links. A bar shows how much of the 15 MB you have used. If you choose more than fit, the form adds what it can and names the files it left out. Anyone opening a link from a note first sees a **You're leaving** check with the full address; **Continue to site** opens it in a new tab, **Go back** stays.
 3. Click **Create**. A note is visible to the students and parents of every class you ticked who take at least one of the subjects you ticked (a note with no subject is visible to the whole class); a note with no class is visible to staff only. The table and the note's details list all of its classes. Editing a note lets you add or remove classes.
 
 Only the 100 most recently created notes are listed (editing a note does not move it up); a message appears when older ones are hidden. Use **Sort** to switch between **Newest first** and **A–Z**.
@@ -935,7 +935,7 @@ If more than one child is linked to your account, a **Showing** row with each ch
 
 #### Lessons
 
-In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to see the notes teachers have shared with your children's classes. Open a note to read its links and download its file. Notes are read-only.
+In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to see the notes teachers have shared with your children's classes. Open a note to read its links and download its file. Notes are read-only. Opening a link first shows a **You're leaving** check with the full address: teachers add these links, and the app doesn't check what's on them.
 
 ---
 

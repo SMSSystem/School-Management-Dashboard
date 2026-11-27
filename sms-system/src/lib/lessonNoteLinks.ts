@@ -4,12 +4,11 @@
 // that blocks javascript:/data:/vbscript: URLs lives here.
 
 import type { LessonNoteLink } from './firebase';
+import { isWebUrl, parseUrl } from './webUrl';
 
 export const MAX_LESSON_NOTE_LINKS = 10; // mirrors firestore.rules' resourceLinks.size() cap
 export const MAX_LINK_URL_LENGTH = 2048;
 const MAX_LINK_LABEL_LENGTH = 100;
-
-const ALLOWED_PROTOCOLS = ['http:', 'https:'];
 
 // Returns an error message, or null when the URL is acceptable.
 export function validateLessonNoteUrl(input: string): string | null {
@@ -18,15 +17,9 @@ export function validateLessonNoteUrl(input: string): string | null {
   if (trimmed.length > MAX_LINK_URL_LENGTH) {
     return `URL must be ${MAX_LINK_URL_LENGTH} characters or less.`;
   }
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    return 'Enter a valid URL, including https://.';
-  }
-  if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) {
-    return 'Only http:// and https:// links are allowed.';
-  }
+  const parsed = parseUrl(trimmed);
+  if (!parsed) return 'Enter a valid URL, including https://.';
+  if (!isWebUrl(parsed)) return 'Only http:// and https:// links are allowed.';
   return null;
 }
 
