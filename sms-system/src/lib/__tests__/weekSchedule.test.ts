@@ -5,6 +5,7 @@ import {
   buildWeek,
   clampWeek,
   dayInfo,
+  dayItems,
   defaultWeek,
   isIsoDate,
   mondayOf,
@@ -112,7 +113,7 @@ describe("days shown", () => {
       "thu",
       "fri",
     ]);
-    expect(week.days[0].label).toBe("Nov 23");
+    expect(week.days[0].label).toBe("23 Nov");
     expect(week.days.filter((d) => d.today).map((d) => d.date)).toEqual([
       "2026-11-25",
     ]);
@@ -441,5 +442,53 @@ describe("default week", () => {
   it("opens on the first week before the year starts and the last week after it ends", () => {
     expect(defaultWeek("2026-08-20", ACADEMIC)).toBe("2026-09-07");
     expect(defaultWeek("2027-05-10", ACADEMIC)).toBe("2027-03-29");
+  });
+});
+
+describe("dayItems (the day view)", () => {
+  it("lists only that day's rows, with free time only while nothing runs", () => {
+    const week = buildWeek(
+      [
+        slot(["mon"], "08:00", 60),
+        slot(["mon"], "10:00", 45),
+        slot(["tue"], "09:00", 60),
+        slot(["mon"], "10:50", 45),
+      ],
+      "2026-11-23",
+      ACADEMIC,
+      WED_10AM,
+    );
+    const monday = dayItems(week, "2026-11-23");
+    expect(monday.map((i) => i.kind)).toEqual([
+      "lessons",
+      "gap",
+      "lessons",
+      "lessons",
+    ]);
+    expect(monday[1]).toEqual({ kind: "gap", start: "09:00", end: "10:00" });
+    // Tuesday has one lesson and no free time around it.
+    expect(dayItems(week, "2026-11-24").map((i) => i.kind)).toEqual([
+      "lessons",
+    ]);
+    // Wednesday has nothing.
+    expect(dayItems(week, "2026-11-25")).toEqual([]);
+  });
+
+  it("starts free time after the longest lesson of the day ends", () => {
+    const week = buildWeek(
+      [
+        slot(["mon"], "08:00", 120),
+        slot(["mon"], "08:30", 30),
+        slot(["mon"], "10:30", 45),
+      ],
+      "2026-11-23",
+      ACADEMIC,
+      WED_10AM,
+    );
+    expect(dayItems(week, "2026-11-23")[2]).toEqual({
+      kind: "gap",
+      start: "10:00",
+      end: "10:30",
+    });
   });
 });
