@@ -95,8 +95,8 @@ describe("the delete path and the dialog", () => {
     expect(formModal).toContain("disabled={deleting || examBlocked}");
     expect(formModal).toContain("examDelete.sitting > 0");
     expect(formModal).toContain("<ExamDeleteNotice preflight={examDelete} />");
-    expect(formModal).toContain(
-      "err instanceof ExamDeleteBlockedError ? err.message",
+    expect(flat(formModal)).toContain(
+      flat("err instanceof ExamDeleteBlockedError ? err.message"),
     );
   });
 
