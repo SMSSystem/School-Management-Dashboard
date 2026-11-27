@@ -1,6 +1,6 @@
 # Schedule Page Redesign: Spec
 
-> **Status:** PR A (the week logic, the reads and the cache refresh) is built, in v2.64.1; the page (B) and the tour (C) are still to come. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
+> **Status:** PR A (the week logic, the reads and the cache refresh) shipped in v2.64.1; PR B (the page) is built; the tour (C) is still to come. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
 > **Base:** app v2.64.0. Where this spec says "today", it means the app as of that version.
 > **Model:** the SMS Demo, demo version v1.0.4, live at `https://sms-demo.solutions.genr83d.com/dashboard/schedule`. It was walked as all five roles on 2026-11-27. The demo's source code is private.
 > **Scope of this document:** what the page does and why, for every role. A step-by-step build plan is kept separately and privately; this spec holds every decision.

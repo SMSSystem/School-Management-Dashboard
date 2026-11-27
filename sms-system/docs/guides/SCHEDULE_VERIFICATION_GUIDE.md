@@ -3,7 +3,7 @@
 > **Feature:** Timetable slot management and schedule viewing
 > **Route:** `/schedule`
 > **Branch:** `mvp`
-> **Last updated:** 2026-06-01
+> **Last updated:** 2026-11-27 (the week and day Schedule page; spec `docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`)
 
 ---
 
@@ -48,33 +48,37 @@ Log in as each role in turn and confirm the **Schedule** entry appears in the le
 ## Scenario 2 — institution_admin: full management access
 
 1. Log in as `institution_admin`, navigate to `/schedule`.
-2. Confirm the term selector is present and pre-selects the **most recent term** (sorted by `startDate` descending).
-3. Confirm the **"Add Slot"** button is visible in the header row.
+2. Confirm there is **no Term selector**. The page opens on the first class in natural order (Grade 2A before Grade 10A) and this week (or the next school week on a weekend or a break).
+3. Confirm the **"Add slot"** button is visible in the header row.
 
 **Create a slot:**
 
 4. Click Add Slot — the form modal opens.
 5. Fill in: Term, Subject, Teacher, at least one day checkbox, Start Time (`09:00`), Duration (`60`), optional Room.
-6. Submit. The modal closes and the new slot card appears under the correct day column — no page refresh required (real-time `onSnapshot`).
+6. Submit. The modal closes and the new lesson appears on its days in the week grid, with no page refresh (the page refreshes its own cache after a save).
 
 **Edit a slot:**
 
-7. Click the edit (pencil) icon on a slot card. The form opens pre-filled with existing values.
+7. Click the **Edit** (pencil) button on a lesson card. The form opens pre-filled with existing values.
 8. Change the start time or room. Submit.
 9. Verify the card updates immediately.
 
 **Delete a slot:**
 
-10. Click the delete (bin) icon on a slot card. Confirm the deletion prompt.
+10. Click the **Delete** (bin) button on a lesson card. Confirm the deletion prompt.
 11. Verify the card disappears from the timetable.
 
 ---
 
-## Scenario 3 — Term selector behaviour
+## Scenario 3 — Weeks, views and the URL
 
-1. With two or more terms in Firestore, use the term selector dropdown to switch terms.
-2. Verify the timetable **clears immediately** when a new term is selected — no stale cards from the previous term visible during load.
-3. Verify slots for the newly selected term populate correctly.
+1. Under **Show**, pick **A teacher** and a teacher; the address gains `by=teacher&id=…`.
+2. Click **›** a few times. Weeks in another term of the active year show that term's lessons; there is no Term picker. Reload: the same week and teacher come back. **Today** returns to the opening week and is then disabled.
+3. Go back to the first week of the active year: **‹** is disabled with a note, "The timetable before … isn't available here." Likewise at the last week with **›**.
+4. Switch **Week** and **Day**. In Day, the chips show the week's days; today's chip says "(today)" and the selected chip is filled. On a phone (below 768 px) only Day is offered.
+5. A holiday shows its name on its column (Week) or as "No school on …" (Day). A gap of 15 minutes or more between lessons shows **Free time**, never while a longer lesson is still running.
+6. Make two slots overlap for one class: both lessons get a red **Clash** tag and the footer counts it. Delete one afterwards.
+7. **Custom calendar mode** (two overlapping time blocks): a day is greyed only when no block teaches; a block that is off shows a note under the date ("Block: no class, reason"); cards name their block only when the week shows two or more blocks.
 
 ---
 
@@ -95,7 +99,7 @@ _First grant access via the Manage Access panel in Scenario 4, then log in as th
 
 1. Navigate to `/schedule`.
 2. Confirm the **"Add Slot"** button is visible.
-3. Confirm **Edit** and **Delete** buttons are visible on slot cards.
+3. Confirm **Edit** and **Delete** buttons are visible on lessons whose teacher is in this teacher's own department, and **not** on other departments' lessons.
 4. Open the Add Slot form — verify the **Teacher dropdown only shows teachers from this teacher's own department**, not all institution teachers.
 5. Create a slot. Verify it appears in the timetable.
 6. Confirm the **"Delegate Schedule Access"** panel is **not visible** (panel is `institution_admin` only).
@@ -109,7 +113,7 @@ _Ensure the flag is absent or `false` on this user's Firestore document._
 1. Navigate to `/schedule`.
 2. Confirm **no "Add Slot"** button is shown.
 3. Confirm **no Edit or Delete** buttons are visible on slot cards.
-4. Confirm the timetable is fully readable — term selector works, slot cards display correctly.
+4. Confirm the timetable is fully readable: it opens on the teacher's own week, and **Show** lists classes and the teachers named on subjects.
 5. Confirm **"Delegate Schedule Access"** panel is not visible.
 
 ---
@@ -122,8 +126,8 @@ Repeat the following for each role:
 2. Confirm no **"Add Slot"** button.
 3. Confirm no **Edit / Delete** buttons on slot cards.
 4. Confirm no **"Delegate Schedule Access"** panel.
-5. For `regular_teacher`: confirm the term selector and slot display work correctly.
-6. For `student` and `parent`: confirm there is **no** term selector, and that slots from every currently active term / time block of the (child's) class are shown. When more than one block is active, each card carries its block name. Slot edits made by an admin reach students after the 5-minute cache expires or on their next session (staff views are live).
+5. For `regular_teacher`: confirm the page opens on their own week, with no **Show** choice.
+6. For `student` and `parent`: confirm there is **no** Term selector and no **Show** choice, and the title is "Your timetable" or "Jordan's timetable". Only the student's own classes show (only the subjects they take in an additional class). A parent with several children switches with the chips under **Showing:**. When two or more time blocks show, each card carries its block name. Slot edits made by an admin reach students within 10 minutes (their cached timetable), and the admin's own screen at once.
 
 ---
 
@@ -155,12 +159,14 @@ Log in as `institution_admin` or a `senior_teacher` with `canGenerateSchedule: t
 
 ---
 
-## Scenario 9 — Real-time updates (onSnapshot)
+## Scenario 9 — Cached reads (no live listener)
 
-1. Open `/schedule` in two browser tabs, both logged in as `institution_admin`, same term selected.
-2. Create a slot in **Tab 1**.
-3. Without refreshing, switch to **Tab 2** — the new slot card should appear automatically.
-4. Delete the slot in **Tab 2** — it disappears from Tab 1 without a refresh.
+The page reads a class's or teacher's week once and caches it for 10 minutes; it keeps no live listener (spec §5).
+
+1. Open `/schedule` in two browser tabs, both logged in as `institution_admin`, on the same class.
+2. Create a slot in **Tab 1**: it shows in Tab 1 at once.
+3. **Tab 2** shows it after its cache goes stale (up to 10 minutes) and the page is opened again, or after a reload.
+4. Moving between weeks of the same term in either tab makes no new reads (check the Network panel: no new Firestore requests).
 
 ---
 

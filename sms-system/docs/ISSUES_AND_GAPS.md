@@ -650,7 +650,7 @@ Related gaps closed in the same change:
 **Schedule and Lessons (follow-up):**
 
 - The Schedule page queried `timetable_slots` by term only, so students and parents saw **every class's** slots. Students now see their own class and parents the selected child's class (`classId ==` + `termId ==`, equality only, no new index); teachers and admins keep the institution-wide term view. _Superseded by #50: students and parents no longer pick a term._
-- Below `md` the Schedule is a Mon–Sat day strip with a per-day agenda (`MobileSchedule`, `lib/scheduleDay.ts`); from `md` up the existing grid is unchanged.
+- Below `md` the Schedule is a Mon–Sat day strip with a per-day agenda (`MobileSchedule`, `lib/scheduleDay.ts`); from `md` up the existing grid is unchanged. _Superseded by the Schedule redesign (v2.65.0 or later): `MobileSchedule` is gone; phones get the new page's Day view with dated day chips (`scenes/(dashboard)/schedule/ScheduleDayChips.tsx`)._
 - Lessons shows tappable cards on phones, with a search box and subject chips (client-side over the notes already loaded) and a bottom-sheet note viewer (`LessonNoteViewDialog`).
 - `Table` now chooses cards or table with a JS media query, so only one is mounted at a time.
 - The institution logo is hidden on the User Profile page below `md`.
@@ -787,7 +787,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 **Limits:**
 
-- An admin teacher has no Teachers-list or detail page, no personal "my schedule" view (`BigCalender` filters by teacher role) and is not in grade-entry tracking's roster. Not changed; revisit when a concrete blocked action is named.
+- An admin teacher has no Teachers-list or detail page, no personal "my schedule" view (`BigCalender` filters by teacher role) and is not in grade-entry tracking's roster. Not changed; revisit when a concrete blocked action is named. The redesigned Schedule page lets an admin pick themself under **Show → A teacher** (they are in the teaching staff list), but it does not open on their own week.
 - A stored teacher name is a copy: renaming or deactivating an admin does not update the subjects, departments or assignments that hold it.
 - The pickers list deactivated accounts too, as before.
 
@@ -849,7 +849,8 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - A student's Schedule is cached (5 minutes, and across reloads in the tab via the session cache), not live: a timetable edit by an admin shows after the cache expires or on the next session. Staff views remain live.
 - In academic mode, `activeTerm` is date-based, so between terms (a holiday gap) students and parents see "No term or time block is currently active" instead of the previous `status === 'active'` fallback. This matches the dashboard.
 - In mock and blank data modes the calendar hook is disabled, so the class-scoped view shows that same message (dev only).
-- Class scoping is still client-side: the `timetable_slots` read rule is institution-wide. See the security report (S-09).
+- Class scoping is still client-side: the `timetable_slots` read rule is institution-wide. See the security report (S-09). The redesigned Schedule page (spec decision D6) also scopes its reads in the browser only: each view queries one class or one teacher, but the rules would allow more. Tightening the rule is the BACKLOG Security entry "limit who can read timetable slots".
+- **Redesign (later):** staff no longer have a Term picker or a live listener either. Every role sees one week on real dates, read once and cached (10 minutes); see `docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`.
 
 **Deferred:** none.
 

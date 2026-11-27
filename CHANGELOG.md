@@ -6,7 +6,21 @@ All notable changes to the School Management System, newest first. Versions foll
 
 ## Unreleased
 
-_Nothing yet._
+**Added**
+
+- A new Schedule page: one week of a class's or a teacher's timetable on real dates, as a week grid or a day list, with arrows to move between weeks and a Today button. Holidays and breaks show their name, the lesson on now is ringed, today is tinted, and gaps of 15 minutes or more show as free time.
+- Admins and spectators can show any class or teacher; senior teachers can too, and open on their own week. Regular teachers see their own week.
+- Students see one timetable across all their classes; parents switch between children with chips. Phones get the day view with day chips.
+- Staff see a Clash tag on lessons that overlap, and the week's lesson and clash counts. The page address keeps the class or teacher, the week and the view, so a link opens the same timetable.
+
+**Changed**
+
+- The Schedule page has no Term picker: the week decides the term, inside the active school year (or the active time blocks). Choosing a week no longer changes the term on Gradebook and the other pages.
+- A senior teacher with schedule access can edit only lessons whose teacher is in their own department, the same teachers the slot form lets them pick.
+
+**Removed**
+
+- The old list of weekdays on the Schedule page, and its separate phone layout.
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
