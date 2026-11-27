@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.65.0"></a>
 <details open>
-<summary><strong>v2.65.0</strong> · 2026-11-27 · Week and Day Schedule</summary>
+<summary><strong>v2.65.0</strong> · 2026-11-27 · Week and Day Schedule (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/129">#129</a>)</summary>
 
 **Added**
 
