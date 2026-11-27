@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.64.0 · **Last updated:** 2026-11-26
+**Current version:** v2.64.1 · **Last updated:** 2026-11-27
 
 ## Unreleased
 
@@ -10,8 +10,22 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.64.0"></a>
+<a id="v2.64.1"></a>
 <details open>
+<summary><strong>v2.64.1</strong> · 2026-11-27 · Schedule Week Logic and Timetable Cache Refresh</summary>
+
+**Fixed**
+
+- A timetable slot that is added, changed or deleted now shows at once on students' and parents' next-class card and calendar, instead of up to ten minutes later.
+
+**Changed**
+
+- Groundwork for the new Schedule page: how a week is laid out (days, lesson rows, free time, clashes, holidays and term breaks, in both calendar modes), who may look at which class or teacher, and the reads it makes. Nothing on the page changes yet.
+
+</details>
+
+<a id="v2.64.0"></a>
+<details>
 <summary><strong>v2.64.0</strong> · 2026-11-26 · Public Landing Page, Off Until Launch (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/127">#127</a>)</summary>
 
 **Added**
