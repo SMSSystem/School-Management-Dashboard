@@ -43,10 +43,10 @@ export default function Hero({ ctaRef }: { ctaRef: Ref<HTMLDivElement> }) {
               {hero.body}
             </p>
             <div ref={ctaRef} className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <DemoLink className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full bg-sky px-7 font-ui font-bold text-night transition-colors duration-100 hover:bg-sky-hover" />
+              <DemoLink className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full bg-sky px-7 font-ui font-bold text-night motion-safe:transition-colors motion-safe:duration-100 hover:bg-sky-hover" />
               <a
                 href={LOGIN_URL}
-                className="inline-flex min-h-12 items-center justify-center rounded-full border-2 border-white/80 px-7 font-ui font-bold text-white transition-colors duration-100 hover:bg-white/10"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border-2 border-white/80 px-7 font-ui font-bold text-white motion-safe:transition-colors motion-safe:duration-100 hover:bg-white/10"
               >
                 {ui.login}
               </a>

@@ -7,7 +7,7 @@ import DemoLink from "./DemoLink";
 import { LOGIN_URL, OPERATOR_NAME, PRODUCT_NAME, ui } from "../content";
 
 const LINK =
-  "inline-flex min-h-11 items-center gap-1 rounded text-muted transition-colors duration-200 hover:text-fg";
+  "inline-flex min-h-11 items-center gap-1 rounded text-muted motion-safe:transition-colors motion-safe:duration-200 hover:text-fg";
 
 // The page's footer (a `contentinfo` landmark: it sits outside <main>). Same operator credit, year and demo link as the
 // sign-in footer (components/PublicFooter.tsx), at the landing page's scale. The privacy notice and terms are

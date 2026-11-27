@@ -56,7 +56,7 @@ export default function Header({ atTop }: { atTop: boolean }) {
             <a
               key={item.href}
               href={item.href}
-              className="rounded-full px-4 py-2 font-medium text-fg transition-colors duration-200 hover:bg-surface-3"
+              className="rounded-full px-4 py-2 font-medium text-fg motion-safe:transition-colors motion-safe:duration-200 hover:bg-surface-3"
             >
               {item.label}
             </a>
@@ -69,11 +69,11 @@ export default function Header({ atTop }: { atTop: boolean }) {
           </div>
           <a
             href={LOGIN_URL}
-            className="inline-flex min-h-11 items-center rounded-full border-2 whitespace-nowrap border-[var(--hdr-fg)] px-4 font-ui text-sm font-bold text-[var(--hdr-fg)] transition-colors duration-100 hover:bg-[color-mix(in_srgb,var(--hdr-fg)_10%,transparent)] lg:px-5"
+            className="inline-flex min-h-11 items-center rounded-full border-2 whitespace-nowrap border-[var(--hdr-fg)] px-4 font-ui text-sm font-bold text-[var(--hdr-fg)] motion-safe:transition-colors motion-safe:duration-100 hover:bg-[color-mix(in_srgb,var(--hdr-fg)_10%,transparent)] lg:px-5"
           >
             {ui.login}
           </a>
-          <DemoLink className="hidden min-h-11 items-center gap-1.5 rounded-full bg-primary px-5 font-ui text-sm font-bold text-on-primary transition-colors duration-100 hover:bg-primary-hover lg:inline-flex" />
+          <DemoLink className="hidden min-h-11 items-center gap-1.5 rounded-full bg-primary px-5 font-ui text-sm font-bold text-on-primary motion-safe:transition-colors motion-safe:duration-100 hover:bg-primary-hover lg:inline-flex" />
 
           {/* Phones and tablets */}
           <details ref={menu} className="ld-menu lg:hidden">

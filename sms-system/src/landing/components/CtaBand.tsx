@@ -36,7 +36,7 @@ export default function CtaBand() {
         <p className="mx-auto mt-4 max-w-xl text-lg text-white/85">
           {cta.body}
         </p>
-        <DemoLink className="mt-8 inline-flex min-h-12 items-center gap-1.5 rounded-full bg-sky px-8 font-ui font-bold text-night transition-colors duration-100 hover:bg-sky-hover" />
+        <DemoLink className="mt-8 inline-flex min-h-12 items-center gap-1.5 rounded-full bg-sky px-8 font-ui font-bold text-night motion-safe:transition-colors motion-safe:duration-100 hover:bg-sky-hover" />
       </div>
     </section>
   );

@@ -213,12 +213,15 @@ describe("the worker", () => {
     );
   });
 
-  it("fetches `/` (the app or the landing page) from the network first, and the stored copy only offline", () => {
+  it("fetches `/` (the app or the landing page) from the network first, and the stored copy offline or after 4 s", () => {
     expect(sw).toContain(
       flat('({ request, url }) => request.mode === "navigate" && url.pathname === "/",'),
     );
-    expect(sw).toContain(flat("return await fetch(request);"));
-    expect(sw).toContain(flat('return (await matchPrecache("index.html")) ?? Response.error();'));
+    expect(sw).toContain(flat("const ROOT_NETWORK_TIMEOUT_MS = 4000;"));
+    expect(sw).toContain(flat("const network = fetch(request);"));
+    expect(sw).toContain(flat("network.catch(() => undefined);"));
+    expect(sw).toContain(flat("const response = await Promise.race([network, timer]);"));
+    expect(sw).toContain(flat('return (await matchPrecache("index.html")) ?? network;'));
     // The `/` route is registered before the app-shell route, because the first match wins.
     expect(swSrc.indexOf('url.pathname === "/"')).toBeLessThan(swSrc.indexOf("new NavigationRoute("));
   });

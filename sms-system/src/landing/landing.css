@@ -504,14 +504,20 @@ html.js .ld-header[data-at-top="true"] .ld-header-bar {
   font-variant-numeric: tabular-nums;
 }
 
-/* Reduced motion, the backstop: anything that still animates or transitions is stopped. Scroll-driven effects above
-   are already off under this setting. */
+/* Reduced motion, the backstop. Every effect above, and every `motion-safe:` utility in the components, is already
+   off under this setting; this stops anything added later without a guard: no animation or transition runs, nothing
+   waits on a delay, and in-page links jump instead of scrolling. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
 }

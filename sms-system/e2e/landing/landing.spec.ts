@@ -212,6 +212,13 @@ test.describe("with JavaScript off", () => {
 test("with reduced motion nothing animates", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
+  // Hover effects change colour at once: the `motion-safe:` fades are not set up at all.
+  const heroDemo = page.locator("#main a[href*='sms-demo']").first();
+  await heroDemo.hover();
+  expect(
+    await heroDemo.evaluate((el) => getComputedStyle(el).transitionProperty),
+  ).toBe("all");
+  await page.locator("footer a").first().hover();
   await page.mouse.wheel(0, 400);
   const running = await page.evaluate(
     () =>

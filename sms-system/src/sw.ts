@@ -23,16 +23,26 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // `/` is whatever dist/index.html is: the app, or the public landing page when VITE_LANDING_ENABLED is on
-// (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). It is fetched from the network so the current one is shown, and
-// the stored copy is used only when there is no connection. Registered first: the first matching route wins.
+// (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). It is fetched from the network so the current one is shown. The
+// stored copy is used when there is no connection, or when the network has not answered within ROOT_NETWORK_TIMEOUT_MS
+// (a connection that hangs instead of failing would otherwise keep the visitor waiting for the browser's own timeout).
+// With nothing stored, it keeps waiting for the network. Registered first: the first matching route wins.
+const ROOT_NETWORK_TIMEOUT_MS = 4000;
 registerRoute(
   ({ request, url }) => request.mode === "navigate" && url.pathname === "/",
   async ({ request }) => {
+    const network = fetch(request);
+    network.catch(() => undefined); // handled below; stops an unhandled rejection when the timer wins
+    const timer = new Promise<undefined>((resolve) =>
+      setTimeout(resolve, ROOT_NETWORK_TIMEOUT_MS),
+    );
     try {
-      return await fetch(request);
+      const response = await Promise.race([network, timer]);
+      if (response) return response;
     } catch {
-      return (await matchPrecache("index.html")) ?? Response.error();
+      // no connection: use the stored copy
     }
+    return (await matchPrecache("index.html")) ?? network;
   },
 );
 

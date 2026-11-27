@@ -80,7 +80,7 @@ export default function FeatureStory() {
                   items.current[i] = el;
                 }}
                 data-index={i}
-                className={`ld-story-item flex flex-col justify-center border-l-4 pl-5 transition-colors duration-500 ${
+                className={`ld-story-item flex flex-col justify-center border-l-4 pl-5 motion-safe:transition-colors motion-safe:duration-500 ${
                   active === i ? "lg:border-accent" : ""
                 } border-transparent`}
               >
@@ -139,7 +139,7 @@ export default function FeatureStory() {
         <div className="ld-story-sticky" aria-hidden="true">
           <div className="sticky top-28">
             <div
-              className={`relative aspect-[5/4] overflow-hidden rounded-[2rem] transition-colors duration-500 ${TINT[stories[active].tint]}`}
+              className={`relative aspect-[5/4] overflow-hidden rounded-[2rem] motion-safe:transition-colors motion-safe:duration-500 ${TINT[stories[active].tint]}`}
             >
               {stories.map((s, i) => (
                 <div
