@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.64.1"></a>
 <details open>
-<summary><strong>v2.64.1</strong> · 2026-11-27 · Schedule Week Logic and Timetable Cache Refresh</summary>
+<summary><strong>v2.64.1</strong> · 2026-11-27 · Schedule Week Logic and Timetable Cache Refresh (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/128">#128</a>)</summary>
 
 **Changed**
 
