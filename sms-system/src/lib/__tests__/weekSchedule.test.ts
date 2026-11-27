@@ -287,6 +287,45 @@ describe("rows", () => {
     expect(noGap.rows.map((r) => r.kind)).toEqual(["lessons", "lessons"]);
   });
 
+  it("never shows free time while a longer lesson on another day is still running", () => {
+    // Mon 08:30-09:15, but Tue 08:30-10:00 (a double lesson), then Mon 09:30: the row ends at 09:15, yet no gap.
+    const week = buildWeek(
+      [
+        slot(["mon"], "08:30", 45),
+        slot(["wed"], "08:30", 45),
+        slot(["tue"], "08:30", 90),
+        slot(["mon"], "09:30", 45),
+      ],
+      "2026-11-23",
+      ACADEMIC,
+      WED_10AM,
+    );
+    expect(week.rows).toEqual([
+      { kind: "lessons", start: "08:30", end: "09:15" },
+      { kind: "lessons", start: "09:30", end: "10:15" },
+    ]);
+  });
+
+  it("starts free time only after every lesson begun so far has ended", () => {
+    // 08:00-10:00 (long), 08:30-09:00, then 10:30: the gap is 10:00-10:30, not 09:00-10:30.
+    const week = buildWeek(
+      [
+        slot(["mon"], "08:00", 120),
+        slot(["tue"], "08:30", 30),
+        slot(["mon"], "10:30", 45),
+      ],
+      "2026-11-23",
+      ACADEMIC,
+      WED_10AM,
+    );
+    expect(week.rows).toEqual([
+      { kind: "lessons", start: "08:00", end: "10:00" },
+      { kind: "lessons", start: "08:30", end: "09:00" },
+      { kind: "gap", start: "10:00", end: "10:30" },
+      { kind: "lessons", start: "10:30", end: "11:15" },
+    ]);
+  });
+
   it("skips slots without a usable start time", () => {
     const week = buildWeek(
       [slot(["mon"], "", 45), slot(["mon"], "later", 45)],

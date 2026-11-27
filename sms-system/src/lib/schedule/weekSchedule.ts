@@ -286,24 +286,36 @@ function weekDays(
   });
 }
 
-/** The rows: one per distinct start time, ending at its lessons' most common end (the earlier on a tie). */
+/** A row's displayed end: its lessons' most common end, the earlier on a tie. */
+function commonEnd(ends: number[]): number {
+  const counts = new Map<number, number>();
+  for (const e of ends) counts.set(e, (counts.get(e) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+}
+
+/**
+ * The rows: one per distinct start time, ending at its lessons' most common end. A "Free time" row is added only when
+ * no lesson of the week is still running: the gap starts at the latest end of every lesson started so far (`busyUntil`),
+ * so a double lesson on one day never shows as free time (rows are shared by every day of the week).
+ */
 function rowsOf<S extends ScheduleSlot>(lessons: Lesson<S>[]): WeekRow[] {
   const endsByStart = new Map<number, number[]>();
   for (const l of lessons)
     endsByStart.set(l.start, [...(endsByStart.get(l.start) ?? []), l.end]);
   const starts = [...endsByStart.keys()].sort((a, b) => a - b);
   const rows: WeekRow[] = [];
+  let busyUntil = -1;
   starts.forEach((start, i) => {
-    const counts = new Map<number, number>();
-    for (const e of endsByStart.get(start) ?? [])
-      counts.set(e, (counts.get(e) ?? 0) + 1);
-    const end = [...counts.entries()].sort(
-      (a, b) => b[1] - a[1] || a[0] - b[0],
-    )[0][0];
-    rows.push({ kind: "lessons", start: hhmmOf(start), end: hhmmOf(end) });
+    const ends = endsByStart.get(start) ?? [];
+    busyUntil = Math.max(busyUntil, ...ends);
+    rows.push({
+      kind: "lessons",
+      start: hhmmOf(start),
+      end: hhmmOf(commonEnd(ends)),
+    });
     const next = starts[i + 1];
-    if (next !== undefined && next - end >= GAP_ROW_MINUTES) {
-      rows.push({ kind: "gap", start: hhmmOf(end), end: hhmmOf(next) });
+    if (next !== undefined && next - busyUntil >= GAP_ROW_MINUTES) {
+      rows.push({ kind: "gap", start: hhmmOf(busyUntil), end: hhmmOf(next) });
     }
   });
   return rows;
