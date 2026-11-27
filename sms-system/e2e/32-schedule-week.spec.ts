@@ -151,44 +151,82 @@ test('senior teacher: opens on their own week, and may look at other teachers', 
 });
 
 // Needs the firestore.rules clause that lets a senior teacher read their own department's teachers (deploy it first:
-// npm run firebase:deploy:rules). The QA senior teacher gets schedule access for the test and loses it after.
+// npm run firebase:deploy:rules). The QA institution has no timetable, so the test adds two slots to one class in the
+// active term (one taught by the senior teacher, one by a teacher outside their department), gives the senior teacher
+// schedule access, checks Edit, then deletes both slots and restores the field.
 test("senior teacher with schedule access: Edit only on their own department's lessons", async ({ page, context }) => {
   test.skip(!SENIOR.email || !SENIOR.password || !HAS_ADMIN_SDK, 'QA senior teacher or service account missing');
   const me = await userByEmail(SENIOR.email!);
   test.skip(!me.departmentId, 'The QA senior teacher has no department');
   const iid = await institutionId();
-  const deptTeachers = await db()
+  const inst = db().collection('institutions').doc(iid);
+  const today = new Date().toLocaleDateString('en-CA');
+
+  // The active term covering today, a class, and a teacher outside the senior teacher's department.
+  const years = await inst.collection('academicYears').where('status', '==', 'active').get();
+  const yearIds = new Set(years.docs.map((d) => d.id));
+  const term = (await inst.collection('terms').get()).docs.find(
+    (d) =>
+      yearIds.has(d.data().academicYearId as string) &&
+      (d.data().startDate as string) <= today &&
+      today <= (d.data().endDate as string),
+  );
+  const cls = (await inst.collection('classes').limit(1).get()).docs[0];
+  const staff = await db()
     .collection('users')
     .where('institutionId', '==', iid)
-    .where('departmentId', '==', me.departmentId)
+    .where('role', 'in', ['regular_teacher', 'senior_teacher'])
     .get();
-  const deptIds = new Set(deptTeachers.docs.map((d) => d.id));
-  const slots = await db().collection('institutions').doc(iid).collection('timetable_slots').get();
-  const own = slots.docs.find((d) => deptIds.has(d.data().teacherId as string));
-  const other = slots.docs.find((d) => d.data().teacherId && !deptIds.has(d.data().teacherId as string));
-  test.skip(!own || !other, 'The QA timetable needs lessons from inside and outside the department');
+  const outsider = staff.docs.find((d) => d.data().departmentId !== me.departmentId);
+  test.skip(!term || !cls || !outsider, 'The QA institution needs an active term covering today, a class and a teacher outside the department');
+
+  const slot = (id: string, teacherId: string, teacherName: string, subjectName: string, startTime: string) => ({
+    id,
+    data: {
+      institutionId: iid,
+      termId: term!.id,
+      termName: String(term!.data().name ?? ''),
+      subjectId: `e2e-${id}`,
+      subjectName,
+      teacherId,
+      teacherName,
+      classId: cls!.id,
+      className: String(cls!.data().name ?? ''),
+      days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      startTime,
+      duration: 30,
+      createdBy: me.uid,
+      createdByRole: 'senior_teacher',
+      createdAt: new Date().toISOString(),
+    },
+  });
+  const seeded = [
+    slot('e2e-schedule-own', me.uid, me.name, 'E2E Own Department', '06:00'),
+    slot('e2e-schedule-other', outsider!.id, String(outsider!.data().name ?? ''), 'E2E Other Department', '06:45'),
+  ];
 
   const before = await snapshotUser(me.uid);
   try {
+    for (const s of seeded) await inst.collection('timetable_slots').doc(s.id).set(s.data);
     await setUserFields(me.uid, { canGenerateSchedule: true });
     await forceLiveData(context);
     await signIn(page, SENIOR);
-    const edit = page.getByRole('button', { name: 'Edit timetable slot' });
-
-    // A week of a teacher in their own department: Edit on the lessons.
-    await openSchedule(page, `?by=teacher&id=${own!.data().teacherId}&view=week`);
+    await openSchedule(page, `?by=class&id=${cls!.id}&view=week`);
     await expect(page.getByRole('button', { name: 'Next week' })).toBeVisible({ timeout: 25_000 });
-    await expect(edit.first()).toBeVisible({ timeout: 20_000 });
 
-    // A teacher in another department: the lessons show, with no Edit.
-    await openSchedule(page, `?by=teacher&id=${other!.data().teacherId}&view=week`);
-    await expect(page.getByRole('button', { name: 'Next week' })).toBeVisible({ timeout: 25_000 });
-    await page.waitForTimeout(3_000);
-    await expect(edit).toHaveCount(0);
+    const card = (subject: string) => page.getByRole('group', { name: new RegExp(`^${subject},`) }).first();
+    await expect(card('E2E Own Department')).toBeVisible({ timeout: 20_000 });
+    await expect(card('E2E Own Department').getByRole('button', { name: 'Edit timetable slot' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(card('E2E Other Department')).toBeVisible();
+    await expect(card('E2E Other Department').getByRole('button', { name: 'Edit timetable slot' })).toHaveCount(0);
   } finally {
+    for (const s of seeded) await inst.collection('timetable_slots').doc(s.id).delete();
     await restoreUserFields(me.uid, before, ['canGenerateSchedule']);
   }
 });
+
 
 test('parent: the child\'s timetable, with a chip per child when there are several', async ({ page, context }) => {
   test.skip(!PARENT.email || !PARENT.password, 'QA parent missing from .env.qa');
