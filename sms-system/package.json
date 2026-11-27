@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore --project demo-sms-rules \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "playwright test",
+    "test:e2e:landing": "playwright test -c playwright.landing.config.ts",
     "firebase:deploy:rules": "firebase deploy --only firestore:rules",
     "firebase:deploy:indexes": "firebase deploy --only firestore:indexes",
     "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes",
@@ -52,6 +53,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
     "@firebase/rules-unit-testing": "^5.0.2",
@@ -64,6 +66,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "10.5",
     "eslint": "^10.5.0",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "fallow": "3.39.0",
