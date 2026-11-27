@@ -15,9 +15,12 @@ const spa = config.rewrites[0];
 const matches = (path: string) => new RegExp('^' + spa.source + '$').test(path);
 
 describe('vercel.json single-page-app rewrite', () => {
+  // The app shell is app.html, a copy of the app's index.html that the build always writes
+  // (scripts/landingBuild.mjs). `/` itself is answered by the real file dist/index.html before any rewrite
+  // (the app, or the landing page when VITE_LANDING_ENABLED is on), so the rewrite never needs to name it.
   it('has one rewrite, to the app shell', () => {
     expect(config.rewrites).toHaveLength(1);
-    expect(spa.destination).toBe('/');
+    expect(spa.destination).toBe('/app.html');
   });
 
   it('still sends app routes to the shell', () => {

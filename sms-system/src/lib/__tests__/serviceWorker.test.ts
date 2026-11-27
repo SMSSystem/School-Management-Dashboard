@@ -204,12 +204,23 @@ describe("installServiceWorker", () => {
 describe("the worker", () => {
   const sw = flat(swSrc);
 
-  it("keeps only the built files and answers page loads with the stored page", () => {
+  it("keeps only the built files and answers app page loads with the stored app shell (app.html)", () => {
     expect(sw).toContain(flat("precacheAndRoute(self.__WB_MANIFEST);"));
-    expect(sw).toContain(flat('createHandlerBoundToURL("index.html")'));
+    expect(sw).toContain(flat('createHandlerBoundToURL("app.html")'));
+    expect(sw).not.toContain(flat('createHandlerBoundToURL("index.html")'));
     expect(sw).toContain(
-      flat("denylist: [/^\\/assets\\//, /^\\/sw\\.js$/, /\\/[^/]+\\.[^/]+$/]"),
+      flat("denylist: [/^\\/$/, /^\\/assets\\//, /^\\/sw\\.js$/, /\\/[^/]+\\.[^/]+$/]"),
     );
+  });
+
+  it("fetches `/` (the app or the landing page) from the network first, and the stored copy only offline", () => {
+    expect(sw).toContain(
+      flat('({ request, url }) => request.mode === "navigate" && url.pathname === "/",'),
+    );
+    expect(sw).toContain(flat("return await fetch(request);"));
+    expect(sw).toContain(flat('return (await matchPrecache("index.html")) ?? Response.error();'));
+    // The `/` route is registered before the app-shell route, because the first match wins.
+    expect(swSrc.indexOf('url.pathname === "/"')).toBeLessThan(swSrc.indexOf("new NavigationRoute("));
   });
 
   it("never caches anything else: no runtime caching, no Firebase", () => {

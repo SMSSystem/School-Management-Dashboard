@@ -7,6 +7,7 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { selectPrecache, type ViteManifest } from './src/lib/serviceWorker/precacheSelection.ts';
+import { landingBuild } from './scripts/landingBuild.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,27 @@ function buildCommit(): string {
 // is the safety switch: the build's worker removes itself from every device on its next visit, and the app stops
 // registering one. Any other value, or none, is the normal worker.
 const swMode = process.env.SERVICE_WORKER === 'remove' ? 'remove' : 'on';
+
+// The public landing page at `/` (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). Off unless VITE_LANDING_ENABLED is
+// "true" in the build's environment, so merging it changes nothing for visitors. Off: landing.html is not built at all
+// (no landing code ships) and dist/index.html is the app, as before. On: dist/index.html is the prerendered landing
+// page. Either way the app is also written as dist/app.html (scripts/landingBuild.mjs explains why).
+const landingEnabled = process.env.VITE_LANDING_ENABLED === 'true';
+
+const define = {
+  __APP_VERSION__: JSON.stringify(appVersion),
+  __APP_COMMIT__: JSON.stringify(buildCommit()),
+  __APP_ENV__: JSON.stringify(process.env.VERCEL_ENV ?? 'development'),
+  // For the copyright line on the sign-in footer, so it never needs editing at New Year.
+  __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
+  __SW_MODE__: JSON.stringify(swMode),
+};
+
+const alias = {
+  '@': path.resolve(__dirname, 'src'),
+  // nextstepjs's Next.js adapter imports this; see the comment in the file
+  'next/navigation': path.resolve(__dirname, 'src/lib/nextNavigationMock.ts'),
+};
 
 const serviceWorker = VitePWA({
   strategies: 'injectManifest',
@@ -54,26 +76,23 @@ const serviceWorker = VitePWA({
 });
 
 export default defineConfig({
-  plugins: [react(), serviceWorker],
+  plugins: [
+    react(),
+    landingBuild({ enabled: landingEnabled, root: __dirname, ssrPlugins: [react()], alias, define }),
+    serviceWorker,
+  ],
   build: {
     // dist/.vite/manifest.json, read above to choose what the service worker keeps.
     manifest: true,
-  },
-  define: {
-    __APP_VERSION__: JSON.stringify(appVersion),
-    __APP_COMMIT__: JSON.stringify(buildCommit()),
-    __APP_ENV__: JSON.stringify(process.env.VERCEL_ENV ?? 'development'),
-    // For the copyright line on the sign-in footer, so it never needs editing at New Year.
-    __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
-    __SW_MODE__: JSON.stringify(swMode),
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-      // nextstepjs's Next.js adapter imports this; see the comment in the file
-      'next/navigation': path.resolve(__dirname, 'src/lib/nextNavigationMock.ts'),
+    rolldownOptions: {
+      // The app is always built from index.html; the landing page only when it is on.
+      input: landingEnabled
+        ? { index: path.resolve(__dirname, 'index.html'), landing: path.resolve(__dirname, 'landing.html') }
+        : { index: path.resolve(__dirname, 'index.html') },
     },
   },
+  define,
+  resolve: { alias },
   test: {
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],

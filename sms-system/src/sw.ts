@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 // The service worker (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice E). It keeps the app's code on the
 // device, never school data: the page, the core app and the two registers' code (lib/serviceWorker/precacheSelection.ts).
-// Every page load is answered with the stored page, so a signed-in tab can reload offline. There is no other caching:
+// Every app page load is answered with the stored app shell, so a signed-in tab can reload offline. There is no other caching:
 // Firebase, reCAPTCHA and EmailJS are on other origins, which this worker never sees.
 //
 // A new version installs in the background and waits. The app tells it to take over at a safe moment
@@ -10,6 +10,7 @@
 import {
   cleanupOutdatedCaches,
   createHandlerBoundToURL,
+  matchPrecache,
   precacheAndRoute,
 } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
@@ -21,11 +22,27 @@ declare const self: ServiceWorkerGlobalScope & {
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// Page loads get the stored page. Files (anything with an extension), the built assets and this worker go to the
-// network as usual, as the Vercel rewrite in vercel.json does.
+// `/` is whatever dist/index.html is: the app, or the public landing page when VITE_LANDING_ENABLED is on
+// (docs/miscellaneous-specs/LANDING_PAGE_SPEC.md). It is fetched from the network so the current one is shown, and
+// the stored copy is used only when there is no connection. Registered first: the first matching route wins.
 registerRoute(
-  new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: [/^\/assets\//, /^\/sw\.js$/, /\/[^/]+\.[^/]+$/],
+  ({ request, url }) => request.mode === "navigate" && url.pathname === "/",
+  async ({ request }) => {
+    try {
+      return await fetch(request);
+    } catch {
+      return (await matchPrecache("index.html")) ?? Response.error();
+    }
+  },
+);
+
+// Every other page load gets the stored app shell. It is `app.html`, which the build always writes as a copy of the
+// app's index.html (scripts/landingBuild.mjs), so app pages keep working when `/` is the landing page. Files
+// (anything with an extension), the built assets and this worker go to the network as usual, as the Vercel rewrite
+// in vercel.json does.
+registerRoute(
+  new NavigationRoute(createHandlerBoundToURL("app.html"), {
+    denylist: [/^\/$/, /^\/assets\//, /^\/sw\.js$/, /\/[^/]+\.[^/]+$/],
   }),
 );
 
