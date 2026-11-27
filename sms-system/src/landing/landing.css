@@ -416,8 +416,16 @@ html.js .ld-header[data-at-top="true"] .ld-header-bar {
   }
 }
 
-/* ── Step cards stack (sticky at 5, 6 and 7rem) only where a whole card fits on screen ── */
-@media (min-height: 46rem) {
+/* ── Step cards stack (sticky at 5, 6 and 7rem) only where a whole card fits on screen ──
+   A stuck card must fit below its offset, or the next card would cover its lower half before it was ever seen. The two
+   layouts have different card heights (measured 2026-11-26 at the 16px root):
+   - two columns (48rem and wider): about 26.5rem tall + 7rem offset = 33.5rem, so from 35rem (560px) of window height.
+     That covers short laptop windows such as 1280x585 and 1366x657.
+   - one column (phones): text above the image, up to about 37rem + 7rem, so from 46rem (736px).
+   Media queries use the browser's 16px rem, not the page's growing root, so on very wide but short windows the cards
+   may simply scroll past; nothing is ever hidden. */
+@media (min-width: 48rem) and (min-height: 35rem),
+  (max-width: 47.99rem) and (min-height: 46rem) {
   .ld-step {
     position: sticky;
   }

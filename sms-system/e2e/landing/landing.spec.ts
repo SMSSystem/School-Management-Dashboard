@@ -236,3 +236,38 @@ test("loads nothing from other sites (no Firebase, reCAPTCHA or trackers)", asyn
   await scrollThrough(page);
   expect(others).toEqual([]);
 });
+
+test("step cards stack on short laptop windows only where a whole card fits", async ({
+  page,
+}) => {
+  const cases = [
+    { width: 1280, height: 585, sticky: true },
+    { width: 1366, height: 657, sticky: true },
+    { width: 1280, height: 800, sticky: true },
+    { width: 1024, height: 500, sticky: false },
+    { width: 375, height: 812, sticky: true },
+    { width: 375, height: 667, sticky: false },
+  ];
+  for (const { width, height, sticky } of cases) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const cards = await page.locator(".ld-step").evaluateAll((els) =>
+      els.map((el) => ({
+        position: getComputedStyle(el).position,
+        top: parseFloat(getComputedStyle(el).top),
+        height: el.getBoundingClientRect().height,
+      })),
+    );
+    for (const card of cards) {
+      expect(card.position, `${width}x${height}`).toBe(
+        sticky ? "sticky" : "static",
+      );
+      // A stuck card always fits below its offset, so the next card never covers part of it unseen.
+      if (sticky)
+        expect(
+          card.top + card.height,
+          `${width}x${height}`,
+        ).toBeLessThanOrEqual(height);
+    }
+  }
+});

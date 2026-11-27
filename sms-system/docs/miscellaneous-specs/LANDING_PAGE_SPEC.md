@@ -99,7 +99,7 @@ Target: **WCAG 2.2 AA**. Checked by `e2e/landing/landing.spec.ts` (axe, light an
   - Hover styles apply only to devices that can hover.
 - **Sizes:** everything is in rem. The root size is `max(100%, calc(50% + 0.556vw))`: the visitor's own size up to 1440px wide, then growing with the screen (about 1.4x at 2560px, 1.8x at 3840px), with no ceiling. Screenshots come in three widths through `srcset`.
   - Trade-off: on very wide screens browser zoom has a smaller effect, because part of the size follows the screen width.
-  - Sticky step cards only stack where a whole card fits (`min-height: 46rem`).
+  - Sticky step cards only stack where a whole card fits: from 35rem (560px) of window height in the two-column layout, 46rem (736px) on phones.
 - **Browsers:** the last two versions of Chrome, Edge, Firefox and Samsung Internet, and Safari 16.4 or later (Tailwind 4's floor, the same as the app's). The scroll-driven effects are inside `@supports` and the page is static without them. The glass has a `-webkit-` prefix and a solid fallback.
 
 ## Design

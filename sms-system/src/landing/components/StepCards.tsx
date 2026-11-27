@@ -4,8 +4,9 @@ import { DisplayHeading, SectionHeader } from "./Headings";
 import { steps, stepsSection } from "../content";
 
 // Three cards that stack as the page scrolls: each sticks a little lower than the last (5, 6, 7rem), so it slides over
-// the one before and leaves a stepped edge. Sticky only where a whole card fits on screen (landing.css, `.ld-step`,
-// `min-height: 46rem`); on short screens and landscape phones they simply stack, so no content is ever covered.
+// the one before and leaves a stepped edge. Sticky only where a whole card fits on screen (landing.css, `.ld-step`:
+// from 35rem of window height with two columns, 46rem on phones); on shorter windows and landscape phones they simply
+// scroll past, so no content is ever covered.
 const CARD = [
   "bg-surface-2 text-fg border border-line",
   "bg-pastel-blue text-on-pastel",
