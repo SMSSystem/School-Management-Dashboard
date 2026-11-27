@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.63.0"></a>
 <details open>
-<summary><strong>v2.63.0</strong> · 2026-11-26 · You're Leaving Check for Outside Links</summary>
+<summary><strong>v2.63.0</strong> · 2026-11-26 · You're Leaving Check for Outside Links (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/126">#126</a>)</summary>
 
 **Added**
 
