@@ -116,3 +116,5 @@ Target: **WCAG 2.2 AA**. Checked by `e2e/landing/landing.spec.ts` (axe, light an
   - On desktop, a sticky screenshot follows the feature list.
   - Step cards stack.
   - Sections reveal as they come into view.
+  - The privacy cards slide in one after another (0.15 s apart, 0.6 s each), once, when the list first reaches the screen: up from below on phones and tablets, in from the right where they sit in a row (64rem and wider). They are hidden only with JavaScript on and motion allowed.
+  - The closing "See it with your own eyes." card zooms from 80% to full size as it comes on screen, full size once all of it is visible, and shrinks again when scrolled back. Browsers without scroll-linked animation (Firefox before 159, older Safari) zoom it once, over 0.6 s, when it is first seen.

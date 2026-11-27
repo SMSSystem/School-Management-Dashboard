@@ -27,6 +27,53 @@ async function scrollThrough(page: Page) {
   });
 }
 
+// Each privacy card's opacity and offset (px), rounded, for the slide-in checks.
+function cardStates(page: Page) {
+  return page.locator(".ld-privacy-cards > li").evaluateAll((els) => {
+    return els.map((el) => {
+      const s = getComputedStyle(el);
+      const m = new DOMMatrixReadOnly(
+        s.transform === "none" ? "" : s.transform,
+      );
+      return {
+        opacity: Math.round(parseFloat(s.opacity) * 100) / 100,
+        x: Math.round(m.m41),
+        y: Math.round(m.m42),
+      };
+    });
+  });
+}
+
+// Scrolls so `shown` of the call-to-action card is on screen from the bottom edge (1 = all of it, centred). Uses the
+// layout box, since the drawn box is scaled, and scrolls instantly, since the page otherwise scrolls smoothly.
+function scrollCta(page: Page, shown: number) {
+  return page.locator(".ld-cta-zoom").evaluate((el, part) => {
+    let top = 0;
+    for (
+      let n = el as HTMLElement | null;
+      n;
+      n = n.offsetParent as HTMLElement | null
+    )
+      top += n.offsetTop;
+    const h = (el as HTMLElement).offsetHeight;
+    const y =
+      part >= 1
+        ? top - (window.innerHeight - h) / 2
+        : top - window.innerHeight + h * part;
+    window.scrollTo({ top: y, behavior: "instant" });
+  }, shown);
+}
+
+// The call-to-action card's current scale, to two places.
+function ctaScale(page: Page) {
+  return page.locator(".ld-cta-zoom").evaluate((el) => {
+    const t = getComputedStyle(el).transform;
+    return (
+      Math.round(new DOMMatrixReadOnly(t === "none" ? "" : t).a * 100) / 100
+    );
+  });
+}
+
 for (const colorScheme of ["light", "dark"] as const) {
   for (const width of [375, 768, 1280, 2560]) {
     test(`no WCAG 2.2 AA violations, ${colorScheme}, ${width}px`, async ({
@@ -138,6 +185,13 @@ test.describe("with JavaScript off", () => {
     await expect(page.locator("#features h3")).toHaveCount(5);
     await expect(page.locator("#steps h3")).toHaveCount(3);
     await expect(page.locator("noscript")).toHaveCount(1);
+    expect(await cardStates(page)).toEqual(
+      Array(4).fill({ opacity: 1, x: 0, y: 0 }),
+    );
+    // The call-to-action zoom is CSS only, so it still follows the scroll where supported; on screen it is full size.
+    await scrollCta(page, 1);
+    await expect.poll(() => ctaScale(page)).toBe(1);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await expect(page.getByRole("radiogroup")).toHaveCount(0);
     await page.locator(".ld-menu > summary").click();
     await expect(
@@ -175,6 +229,93 @@ test("with reduced motion nothing animates", async ({ page }) => {
       getComputedStyle(document.querySelector(".ld-hero-card")!).animationName,
   );
   expect(hero).toBe("none");
+  expect(await cardStates(page)).toEqual(
+    Array(4).fill({ opacity: 1, x: 0, y: 0 }),
+  );
+  expect(await ctaScale(page)).toBe(1);
+});
+
+test.describe("privacy cards slide in one after another", () => {
+  for (const { width, height, from } of [
+    { width: 1280, height: 585, from: "right" },
+    { width: 375, height: 812, from: "below" },
+  ] as const) {
+    test(`from the ${from} at ${width}px, once`, async ({
+      page,
+      browserName,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      const cards = page.locator(".ld-privacy-cards > li");
+      // Not reached yet: hidden and offset, with growing delays.
+      for (const state of await cardStates(page)) {
+        expect(state.opacity).toBe(0);
+        if (from === "right") expect(state.x).toBeGreaterThan(0);
+        else expect(state.y).toBeGreaterThan(0);
+      }
+      expect(
+        await cards.evaluateAll((els) =>
+          els.map((el) => getComputedStyle(el).transitionDelay),
+        ),
+      ).toEqual(["0s", "0.15s", "0.3s", "0.45s"]);
+      await page.locator(".ld-privacy-cards").scrollIntoViewIfNeeded();
+      await expect(page.locator(".ld-privacy-cards")).toHaveAttribute(
+        "data-revealed",
+        "true",
+      );
+      if (browserName === "webkit") {
+        // Playwright's WebKit on Windows stalls transitions part-way (Safari itself does not), so jump any still
+        // running to their end; the end state below is what is checked.
+        await cards.evaluateAll((els) =>
+          els.forEach((el) => {
+            el.getBoundingClientRect(); // applies styles, so pending transitions exist now
+            el.getAnimations().forEach((a) => a.finish());
+          }),
+        );
+      }
+      await expect
+        .poll(() => cardStates(page), { timeout: 5000 })
+        .toEqual(Array(4).fill({ opacity: 1, x: 0, y: 0 }));
+      // Once: scrolling away and back does not hide them again.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(200);
+      expect(await cardStates(page)).toEqual(
+        Array(4).fill({ opacity: 1, x: 0, y: 0 }),
+      );
+    });
+  }
+});
+
+test("the call-to-action card zooms in as it comes on screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 585 });
+  await page.goto("/");
+  const scrollLinked = await page.evaluate(() =>
+    CSS.supports("animation-timeline: view()"),
+  );
+  const partWay = async () => {
+    const scale = await ctaScale(page);
+    return scale > 0.82 && scale < 0.98;
+  };
+  if (scrollLinked) {
+    // Tied to the scroll: part-way while half on screen, full size once it is all on screen, smaller again on the
+    // way back.
+    await scrollCta(page, 0.5);
+    await expect.poll(partWay).toBe(true);
+    await scrollCta(page, 1);
+    await expect.poll(() => ctaScale(page)).toBe(1);
+    await scrollCta(page, 0.5);
+    await expect.poll(partWay).toBe(true);
+  } else {
+    // Fallback: small until first seen, then one zoom to full size that stays.
+    expect(await ctaScale(page)).toBe(0.8);
+    await scrollCta(page, 1);
+    await expect.poll(() => ctaScale(page), { timeout: 3000 }).toBe(1);
+    await scrollCta(page, 0.5);
+    await page.waitForTimeout(200);
+    expect(await ctaScale(page)).toBe(1);
+  }
 });
 
 test.describe("on a touch phone", () => {

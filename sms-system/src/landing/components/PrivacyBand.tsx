@@ -1,12 +1,22 @@
+import type { CSSProperties } from "react";
 import { EyeOff, Lock, Scale, ShieldCheck } from "lucide-react";
 import { SectionHeader } from "./Headings";
 import { privacy } from "../content";
+import { useInView } from "../hooks/useInView";
 
 const ICONS = [ShieldCheck, Lock, EyeOff, Scale];
 
 // The page's dark band: night blue in light mode. In dark mode (where the page itself is night blue) it goes deeper
 // (`--privacy-bg`), with thin edges and a faint sky glow, so it still reads as its own section.
+// The cards slide in one after another the first time the list reaches the screen: `data-revealed` starts the CSS
+// transitions in landing.css ("Privacy cards slide in") and `--i` staggers them. The prerendered page has no
+// `data-revealed`, which is fine: the cards are hidden only under `html.js` with motion allowed.
 export default function PrivacyBand() {
+  const [listRef, revealed] = useInView<HTMLUListElement>(
+    "0px 0px -15% 0px",
+    false,
+    true,
+  );
   return (
     <section
       id="privacy"
@@ -30,13 +40,18 @@ export default function PrivacyBand() {
         >
           <p className="mt-5 text-lg text-white/80">{privacy.body}</p>
         </SectionHeader>
-        <ul className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ul
+          ref={listRef}
+          data-revealed={revealed || undefined}
+          className="ld-privacy-cards mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+        >
           {privacy.points.map((p, i) => {
             const Icon = ICONS[i];
             return (
               <li
                 key={p.title}
-                className="ld-reveal rounded-3xl border border-white/10 bg-white/[0.04] p-7"
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-7"
+                style={{ "--i": i } as CSSProperties}
               >
                 <Icon className="size-7 text-sky" aria-hidden="true" />
                 <h3 className="mt-5 font-ui text-lg font-bold">{p.title}</h3>

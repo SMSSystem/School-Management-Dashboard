@@ -363,6 +363,62 @@ html.js .ld-header[data-at-top="true"] .ld-header-bar {
   }
 }
 
+/* ── Privacy cards slide in, one after another (components/PrivacyBand.tsx) ──────
+   Plays once, when the list first reaches the screen (`data-revealed`, set by JavaScript), 0.15s apart (`--i` is the
+   card's index). Cards rise from below where they stack (phones, tablets) and come in from the right where they sit
+   in a row (64rem and wider). Hidden only under `html.js` with motion allowed, so without JavaScript and with reduced
+   motion they are simply there. */
+@media (prefers-reduced-motion: no-preference) {
+  html.js .ld-privacy-cards > li {
+    transition:
+      opacity 0.6s var(--ease-out-soft),
+      transform 0.6s var(--ease-out-soft);
+    transition-delay: calc(var(--i, 0) * 0.15s);
+  }
+  html.js .ld-privacy-cards:not([data-revealed]) > li {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 64rem) {
+  html.js .ld-privacy-cards:not([data-revealed]) > li {
+    transform: translateX(3rem);
+  }
+}
+
+/* ── Call-to-action zoom (components/CtaBand.tsx) ──────────────────────────────────
+   The card grows from 80% to full size as it comes on screen, reaching full size once the whole card is visible,
+   and shrinks again when scrolled back. Browsers without scroll-linked animation (Firefox before 159, older Safari)
+   get the same zoom once, over 0.6s, when the card is first seen (`data-revealed`). */
+@keyframes ld-cta-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ld-cta-zoom {
+      animation: ld-cta-zoom linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+@supports not (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html.js .ld-cta-zoom {
+      transition:
+        opacity 0.6s var(--ease-out-soft),
+        transform 0.6s var(--ease-out-soft);
+    }
+    html.js .ld-cta-zoom:not([data-revealed]) {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+  }
+}
+
 /* ── Feature story ──────────────────────────────────────────────────────────────
    Three layouts from one list (components/FeatureStory.tsx):
    1. Default (no JavaScript, or a mouse on a narrow screen): stacked blocks, each with its own screenshot.
