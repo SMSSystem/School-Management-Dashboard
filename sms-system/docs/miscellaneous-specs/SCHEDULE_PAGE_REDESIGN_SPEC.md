@@ -1,141 +1,359 @@
 # Schedule Page Redesign: Spec
 
-> **Status:** spec only, nothing built (2026-11-27). Owner decisions D1-D8 below. Built from the live SMS Demo (v1.0.4) walked as all five roles and from a read of the real Schedule code.
+> **Status:** spec only, nothing built. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D15 (section 2).
+> **Base:** app v2.64.0. Where this spec says "today", it means the app as of that version.
+> **Model:** the SMS Demo, demo version v1.0.4, live at `https://sms-demo.solutions.genr83d.com/dashboard/schedule`. It was walked as all five roles on 2026-11-27. The demo's source code is private.
+> **Scope of this document:** what the page does and why, for every role. A step-by-step build plan is kept separately and privately; this spec holds every decision.
 
 ## 1. Context
 
-The real Schedule page (`src/scenes/(dashboard)/schedule/index.tsx`, 374 lines) lists timetable slots in one column per weekday (Mon–Sat), with a Term dropdown for staff, a child `<select>` for parents, an admin-only "Delegate Schedule Access" panel and FormModal add/edit/delete for anyone with `canGenerateSchedule`. It has no dates, no week navigation, no holidays and no "today". On phones it uses `MobileSchedule.tsx` (a Mon–Sat day strip + agenda).
+The real Schedule page (`src/scenes/(dashboard)/schedule/index.tsx`, 374 lines) lists timetable slots in one column per weekday (Mon–Sat). It has:
 
-The SMS Demo (`https://sms-demo.solutions.genr83d.com/dashboard/schedule`, source `sms-demo-interactive/src/features/schedule/SchedulePage.tsx` + `src/selectors/timetable.ts`, live v1.0.4, walked as all five roles on 2026-11-27) shows a **dated week**: a title line ("Grade 5A · Nov 23 to Nov 27"), ‹ › week arrows with a range label, a **Today** button (disabled on the current week), a **Week | Day** segmented control, **day chips** (weekday, date, class-day dot; selected chip filled) in Day view, **child chips** for parents ("Showing: Jordan | Maya"), and **Show [A class | A teacher] + [name]** dropdowns for admin and senior teacher. Lessons are tinted cards (subject in the subject colour, teacher or class, room); the lesson on now is ringed; today's column is tinted; holidays/breaks are named; a footer counts "N lessons this week". Phones get the Day view only. State lives in the URL (`?by=&id=&week=&view=&day=`).
+- a Term dropdown for staff;
+- a child `<select>` for parents;
+- an admin-only "Delegate Schedule Access" panel;
+- FormModal add, edit and delete for anyone with `canGenerateSchedule`.
 
-Goal: rebuild the real page to that look and behaviour on the real data, keeping today's slot editing (restyled). The demo's "Add lesson" button/dialog waits for the future **Lessons** feature.
+It has no dates, no week navigation, no holidays and no "today". On phones it uses `MobileSchedule.tsx`, a Mon–Sat day strip and an agenda.
+
+The SMS Demo shows a **dated week**:
+
+- a title line ("Grade 5A · Nov 23 to Nov 27");
+- ‹ › week arrows with a range label;
+- a **Today** button, disabled on the current week;
+- a **Week | Day** segmented control;
+- **day chips** in Day view (weekday, date, class-day dot; the selected chip filled);
+- **child chips** for parents ("Showing: Jordan | Maya");
+- **Show [A class | A teacher] + [name]** dropdowns for the admin and the senior teacher.
+
+Lessons are tinted cards: the subject in the subject colour, then the teacher or class, then the room. The lesson on now is ringed, today's column is tinted, holidays and breaks are named, and a footer counts "N lessons this week". Phones get the Day view only, and the page's state lives in the URL.
+
+**Goal:** rebuild the real page to that look and behaviour on the real data, keeping today's slot editing (restyled). The demo's "Add lesson" button and dialog wait for the future **Lessons** feature.
 
 ## 2. Decisions (owner, 2026-11-27)
 
 | # | Decision |
 |---|---|
-| D1 | Page keeps the name **Schedule**. Naming rule: **Timetable** = the recurring weekly pattern (the `timetable_slots` data, the sidebar section TIMETABLE, any future pattern editor); **Schedule** = that pattern laid on real dates (this page). |
-| D2 | Regular teacher sees **only their own** week, no dropdowns. BACKLOG: investigate "own + a class dropdown limited to the classes they teach". |
-| D3 | Keep today's slot editing and the Delegate panel, **restyled** (no permission or data change). |
-| D4 | Grid rows come from **slot start–end times** found in the shown week (no periods). Bell schedule → BACKLOG. |
-| D5 | **The week decides the term**: no Term dropdown; the page reads the slots of the term(s) whose dates overlap the shown week. CurrentTermContext stays for other pages; Schedule stops writing it. |
-| D6 | **No rules change here**; slot-read tightening (ISSUES #50 / S-09) → BACKLOG as its own security PR. |
-| D7 | Dashboards keep react-big-calendar for now; replacing them with the new grid → BACKLOG. |
-| D8 | "Add lesson" button + dialog deferred to the Lessons feature → BACKLOG. |
+| D1 | The page keeps the name **Schedule**. **Timetable** means the recurring weekly pattern: the `timetable_slots` data, the sidebar section TIMETABLE, any future pattern editor. **Schedule** means that pattern laid on real dates, which is this page. |
+| D2 | A regular teacher sees **only their own** week, with no dropdowns. A class dropdown limited to the classes they teach is in BACKLOG. |
+| D3 | Today's slot editing and the Delegate panel stay, **restyled**, with no permission or data change. The button is "Add slot". |
+| D4 | Grid rows come from the **slot start times** used in the shown week; there are no periods. A bell schedule is in BACKLOG. |
+| D5 | **The week decides the term.** There is no Term dropdown, and the page reads the slots of the term or terms covering the shown week. `CurrentTermContext` stays for other pages, but Schedule stops writing it. |
+| D6 | **No change to rules, collections or indexes.** Tightening who can read slots (ISSUES #50 / S-09) is in BACKLOG (Security). |
+| D7 | Dashboards keep react-big-calendar for now. Moving them to the new grid is in BACKLOG. |
+| D8 | The "Add lesson" button and dialog wait for the Lessons feature (BACKLOG). |
+| D9 | The work ships as **three pull requests** (section 9). |
+| D10 | The **"Clash" tag is for staff only**: admin, spectator, senior and regular teachers. Students and parents see both lessons, with no tag. |
+| D11 | **All the extra behaviour is in scope:** holidays and breaks named, the lesson on now ringed, today tinted, the weekly lesson count, page state in the URL, clashes shown, Saturday only when used, and the cache refreshed after edits. |
+| D12 | **Personal timetables** with PDF, image and print export, and **automatic timetable generation**, are BACKLOG entries, not part of this work. |
+| D13 | A **senior teacher's "A teacher" list** comes from the teacher ids and names stored on subjects (`teacherIds` / `teacherNames`). The users rules let a teacher read only students, plus their own department's teachers, so the full staff list isn't readable to them. This needs no rules change and no extra reads. Admin and spectator use the users list. |
+| D14 | **The week arrows stay within the active academic year** (academic mode) or the active time blocks (custom mode): the calendar data loaded covers only those dates. At an edge the arrow is disabled and a note says the timetable isn't available. |
+| D15 | **A student, or a parent's child, sees one merged personal week** across all their classes, limited to the subjects they take, through `useClassTimetable`. |
 
-## 3. Terminology (to put in the spec and in code comments)
+## 3. Terminology (also for code comments)
 
-- **Timetable slot**: one `timetable_slots` doc: a class, subject, teacher, `days[]` (`mon`–`sat`), `startTime` "HH:mm", `duration` minutes, optional `room`, tied to one `termId`. A recurring rule, never a dated record.
-- **Lesson (on the page)**: one slot on one date. Computed at render time, never stored (as SCHEDULE_GENERATION_PLAN already says).
-- **Lessons feature (future)**: not Lesson Notes (`lessonNotes`) and not Lesson Plans. The old `/dashboard/list/lessons` placeholder and `institutions/{id}/lessons` rules stay untouched until that feature is scoped.
+- **Timetable slot:** one `timetable_slots` document. It holds a class, a subject, a teacher, `days[]` (`mon`–`sat`), `startTime` "HH:mm", `duration` in minutes, an optional `room`, and one `termId`. It is a recurring rule, never a dated record.
+- **Lesson (on the page):** one slot on one date. It is computed when the page draws, never stored, as SCHEDULE_GENERATION_PLAN already says.
+- **View:** whose week is shown:
+  - a **class's**;
+  - a **teacher's**;
+  - a **student's** merged week (D15), used for students and parents only.
+- **Lessons feature (future):** not Lesson Notes (`lessonNotes`) and not Lesson Plans. The old `/dashboard/list/lessons` placeholder and the `institutions/{id}/lessons` rules stay untouched until that feature is scoped.
 
 ## 4. Behaviour by role
 
-| Role | Opens on | Controls | Edit |
+| Role | Opens on | Controls | Can edit |
 |---|---|---|---|
-| institution_admin | first class (by name) | Show: A class / A teacher + name; week arrows; Today; Week/Day | Add slot, edit/delete on lesson click, Delegate panel |
-| spectator | as admin | as admin | none (read-only) |
-| senior_teacher | own teaching week (by teacher) | as admin | Add/edit/delete only with `canGenerateSchedule` (unchanged) |
-| regular_teacher | own teaching week | arrows, Today, Week/Day | none |
-| student | own class (multi-class via `ClassMembership`, subjects filtered as today) | arrows, Today, Week/Day | none |
-| parent | first child's class | child chips (only when >1 child), arrows, Today, Week/Day | none |
-| super_admin | empty state ("Choose an institution") | none | none |
+| institution_admin | the first class in natural order ("Grade 2A" before "Grade 10A") | Show: A class / A teacher (from the users list) + name; arrows; Today; Week/Day | Add slot; edit or delete by clicking a lesson; the Delegate panel |
+| spectator | as admin | as admin | nothing (read-only) |
+| senior_teacher | their own teaching week | Show: A class / A teacher (**the teacher list comes from subjects**, D13); arrows; Today; Week/Day | only with `canGenerateSchedule`, and only slots whose teacher is in **their own department** (the limit the slot form already applies) |
+| regular_teacher | their own teaching week | arrows; Today; Week/Day | nothing |
+| student | their merged week, titled "Your timetable" (D15) | arrows; Today; Week/Day | nothing |
+| parent | the first child's merged week, titled "Jordan's timetable" | child chips (only with more than one child); arrows; Today; Week/Day | nothing |
+| super_admin | an empty state ("Choose an institution"); no queries | none | nothing |
 
-- **Phones (< md)**: Day view only, with day chips (as the demo and today's MobileSchedule). Day defaults to today, else the week's first school day.
-- **Week opens on** this week, or the next school week on a weekend/break (demo `defaultScheduleWeek`). **Today** returns there; disabled when already there.
-- **Days shown**: Mon–Fri, plus Saturday only when the institution's `schoolWeekDays` includes 6 or any loaded slot uses `sat`.
-- **Non-school days** (outside every term, a `nonSchoolDays` entry, or not in `schoolWeekDays`): column greyed with the reason ("Christmas break", holiday name); no lessons drawn.
-- **Now**: the lesson running now gets a ring; today's column/chip tinted.
-- **Empty states**: no class (student), no linked child (parent), no term covering the week, nothing scheduled.
-- URL state: `?by=class|teacher&id=&week=YYYY-MM-DD&view=week|day&day=YYYY-MM-DD`, validated (unknown ids fall back to the role's default; students/parents/regular teachers ignore `by/id`).
+**Navigation and views**
+
+- **Phones (below the `md` breakpoint):** Day view only, with day chips. The day is today, otherwise the week's first school day.
+- **Opening week:** this week, or the next school week on a weekend or a break. **Today** returns there, and is disabled when already there.
+- **Bounds (D14):** the arrows stop at the first and last weeks of the active year or blocks. At an edge, a note reads, for example, "The timetable after 2 July isn't available here."
+
+**Days shown**
+
+- Mon–Fri, plus Saturday only when the school's `schoolWeekDays` includes 6 or a loaded slot uses `sat`.
+  - Academic mode uses the active year's days.
+  - Custom mode uses the union across the active blocks' years.
+- **Non-school days:** a day not in `schoolWeekDays`, a `nonSchoolDays` entry, or a date between two terms. The column is greyed with the reason (the holiday's name, "Mid-term break", "Term break"), and no lessons are drawn.
+
+**Markers**
+
+- **Now:** the lesson running now gets a ring, and today's column and chip are tinted.
+- **Day chips:** two separate states.
+  - Today's chip has "(today)" in its accessible name.
+  - The selected chip has `aria-pressed="true"`.
+  - On first load they are the same chip, which is what the e2e test checks.
+- **Clashes (D10):**
+  - Two lessons clash when their times overlap on the same date, not only when they start together.
+  - In a class or student view the class or student is booked twice; in a teacher view the teacher is.
+  - Staff see a "Clash" tag on both. Students and parents see both lessons with no tag.
+
+**Scope and state**
+
+- **Student and parent scope:** a student or parent sees only the slots of the student's own classes. In an extra class, they see only the subjects the student takes there. Slots of other classes must never appear. The e2e test checks this and keeps doing so.
+- **Empty states:**
+  - no class (student);
+  - no linked child (parent);
+  - no term active ("No term is active, so there is no timetable to show"; no slot query runs);
+  - nothing scheduled this week.
+- **URL state:**
+  - parameters: `?by=class|teacher&id=&week=YYYY-MM-DD&view=week|day&day=YYYY-MM-DD`;
+  - each value is checked: unknown ids fall back to the role's default, and `week` is clamped to the bounds;
+  - students, parents and regular teachers ignore `by` and `id`, and `by=student` is never taken from the URL;
+  - the URL holds only internal ids, never names, and students' and parents' URLs hold no id.
 
 ## 5. Architecture
 
-Split the 374-line page so every file stays well under 600 lines and logic is pure and testable.
+The 374-line page is split so every file stays well under 600 lines and the logic is pure and testable.
 
 ```
 src/scenes/(dashboard)/schedule/
-  index.tsx                 page shell: role → choices, URL state, layout (≈150 lines)
-  ScheduleToolbar.tsx       arrows, range label, Today, Week/Day, Show/name selects, child chips
-  ScheduleWeekGrid.tsx      table: time rows × day columns (sticky header + time column)
+  index.tsx                 page shell: role → choices, URL state, layout
+  ScheduleToolbar.tsx       arrows (disabled at the bounds), range label, Today, edge note, Week/Day, Show/name selects
+  ScheduleChildChips.tsx    a parent's child chips
+  ScheduleWeekGrid.tsx      table: time rows × day columns (sticky header and time column)
   ScheduleDayList.tsx       one day's lessons as a list
   ScheduleDayChips.tsx      day chips (replaces MobileSchedule's strip)
-  LessonCard.tsx            tinted card; button when editable
+  LessonCard.tsx            tinted card; a button only when the viewer may edit that slot
   DelegateAccessPanel.tsx   today's panel, moved out unchanged in behaviour
 src/lib/schedule/
-  weekSchedule.ts           pure: buildWeek(slots, weekStart, calendar, view) → days, rows, cells, counts
+  weekSchedule.ts           pure: buildWeek(slots, weekStart, calendar, now) → days, rows, cells, counts, edges
   scheduleChoices.ts        pure: role + people → {canChoose, initial, classes, teachers}
-  scheduleUrl.ts            pure: parse/serialise and validate URL state
+  scheduleUrl.ts            pure: parse, check and clamp the URL state
 src/hooks/
-  useWeekTimetable.ts       slots for (by, id, termIds) via React Query
+  useWeekTimetable.ts       a class's or teacher's slots for the week's terms
 ```
 
-Reuse: `lib/scheduleDay.ts` (`DAY_KEYS`, `slotEnd`, `formatTimeRange`, `subjectColor`, `slotStatuses`), `lib/nextClass.ts` (`isoDate`, `classDatesInRange` rules), `lib/attendanceCalendar.ts` `isSchoolDay`, `useInstitutionAcademicCalendar` (terms, `nonSchoolDays`, `schoolWeekDays`), `useInstitutionTerms`, `useLinkedChildren`, `useInstitutionClasses`, `useTeachingStaff`, `useMediaQuery(MOBILE_QUERY)`, the parent dashboard's child-pill pattern, `NamedSelect`, lucide `ChevronLeft/Right`, FormModal `timetable_slot` and `TimetableSlotForm` unchanged.
+**Types:**
 
-**Rows (D4):** collect each lesson's `startTime`/`slotEnd` in the shown week; rows are the distinct start times sorted, labelled "8:30 AM – 9:15 AM" (end = the most common end for that start). A lesson sits in its start row. Two lessons of the same class at the same time (a data clash) both render in the cell, stacked, with a "Clash" tag (no silent hiding).
+- `ScheduleOf = { by: 'class' | 'teacher' | 'student'; id }`.
+- `CalendarInput = { terms, nonSchool, schoolWeekDays, bounds }`.
+- `termsCovering(weekStart, calendar)` returns the ids of the terms whose dates overlap the week. In custom mode the time blocks are the terms.
 
-**Term per week (D5):** `termsCovering(weekStart, weekEnd, allTerms)`; a date belongs to the term whose `startDate..endDate` contains it. `useWeekTimetable` queries `where(by==id) + where('termId','in', termIds)` (≤ 30 ids; normally 1–2). In custom calendar mode the time blocks are the terms.
+**Rows (D4):**
+
+- One row per distinct start time drawn that week, sorted, labelled "8:30 AM – 9:15 AM".
+- A row's end is the most common lesson end; on a tie, the earlier.
+- A lesson with another end shows its own time on its card.
+- *Recommended, to confirm when built:* a thin "Free time" row where 15 minutes or more pass between rows. No row is called "Break" or "Lunch" until there is a bell schedule.
+
+**Choices:**
+
+- Classes come from `useInstitutionClasses`, in natural order (`lib/sortByName.ts` / `lib/classNames.ts`).
+- Teachers come from `useTeachingStaff` for admin and spectator (users list; admins only). For senior teachers they come from `useAllInstitutionSubjects`' `teacherIds`/`teacherNames`, deduplicated by id (D13). A teacher who teaches no subject is missing from that list, which is accepted and recorded in ISSUES_AND_GAPS.
+
+**Reuse:**
+
+- `lib/scheduleDay.ts`: `DAY_KEYS`, `slotEnd`, `formatTimeRange`, `subjectColor` (takes the subject name), `slotStatuses`;
+- `lib/nextClass.ts`: `isoDate`, and the date rules of `classDatesInRange`;
+- `lib/attendanceCalendar.ts`: `isSchoolDay`;
+- `useInstitutionAcademicCalendar`: terms, `nonSchoolDays`, `schoolWeekDays`, active blocks;
+- `useClassTimetable`, with a new optional term list for the student view;
+- `useLinkedChildren`, `useMediaQuery(MOBILE_QUERY)`;
+- the parent dashboard's child-chip pattern;
+- `NamedSelect`, lucide `ChevronLeft`/`ChevronRight`;
+- FormModal `timetable_slot` and `TimetableSlotForm`, unchanged.
 
 **Data and caching (free tier):**
-- Replace the staff `onSnapshot` on the whole term with `getDocs` through React Query, key `['scheduleSlots', institutionId, by, id, termIds]`, `staleTime: REFERENCE_STALE_MS`, persisted like `nextClassSlots`. Week arrows within the same term cost **0 reads**; one read set per class/teacher/term viewed. Today an admin's live listener reads every slot of the term (e.g. ~300 docs per open) and keeps a socket; the new page reads one class's or teacher's slots (~25–40).
-- Students/parents keep `useClassTimetable` (same `nextClassSlots` key as the dashboard, so 0 extra reads) and gain an optional `termIds` argument for weeks in another term.
-- After a slot add/edit/delete, invalidate `['scheduleSlots', institutionId]` and `['nextClassSlots', institutionId]` (fixes today's up-to-10-minute stale gap noted in the analysis).
-- Spark impact: reads go **down**; no writes added; no Functions.
+
+- **Staff views:** the live `onSnapshot` on the whole term is replaced by one `getDocs` through React Query: `where(classId|teacherId == id)` with `where(termId in termIds)`.
+  - Key: `['scheduleSlots', institutionId, by, id, termIds]`, `staleTime: REFERENCE_STALE_MS` (10 min).
+  - The cache stays **in memory only**. It is not added to the persisted `sessionStorage` cache, because slots carry teacher names and the compliance table describes that cache as holding no personal data. Staff rarely reload, so persisting would save little.
+- **Week arrows within the same term cost no reads.** Each class, teacher or term viewed costs one query.
+- **Estimates** (from the Blue Mountain demo seed; to be measured): today an admin's listener reads about 300 slot documents per visit and keeps a connection open; the new page reads about 25–40.
+- **Students and parents** keep `useClassTimetable`, with the same `nextClassSlots` key as the dashboard, so the page costs no extra reads. A week in another term inside the bounds costs one query per class.
+- **After a slot add, edit or delete,** `['scheduleSlots', institutionId]` and `['nextClassSlots', institutionId]` are invalidated. This fixes today's up-to-10-minute delay before an edit shows on students' and parents' dashboards.
+- **Overall:** reads go down; no writes are added; no Cloud Functions.
 
 ## 6. Firebase
 
-- **Rules:** no change (D6). Slot CRUD rules (`firestore.rules` ~2347–2368) and the `users.canGenerateSchedule` admin-only write stay as they are.
-- **Collections:** none new. `timetable_slots` shape unchanged.
-- **Indexes:** none. All queries are equality + `in` on two fields, already used by BigCalender without a composite index.
-- **Later (BACKLOG):** read tightening per role, which would need a rules `get()` per query and rules tests.
+- **Rules:** no change (D6). The slot rules (`firestore.rules` ~2347–2368) and the admin-only write of `users.canGenerateSchedule` stay as they are.
+- **Collections:** none new; the `timetable_slots` shape is unchanged.
+- **Indexes:** none. Every query is "equals" on one field plus `in` on `termId`, which BigCalender already runs without a composite index.
+- **The senior teacher's teacher list** comes from subjects, which are already cached reference data, so it costs no reads (D13).
+- **Later (BACKLOG):** tightening reads per role, which would need a rules `get()` per query and rules tests.
 
 ## 7. Tour
 
-Add a page tour `schedule`, started by a "Take a tour" button (same pattern as Gradebook/Rubrics: `collapseForTour(); startNextStep('schedule')`, completion via `toursCompleted.schedule`). Steps built by `scheduleTourSteps(role)` (pattern of `rubricTourSteps`), targeting stable `#tour-schedule-*` ids:
+A page tour `schedule`, started by a "Take a tour" button, in the same pattern as Gradebook and Rubrics: `collapseForTour(); startNextStep('schedule')`. Finishing or skipping sets `toursCompleted.schedule`. It never starts by itself (`ROLES_WITH_REAL_TOURS` unchanged).
 
-1. `#tour-schedule-heading`: whose week this is.
-2. `#tour-schedule-week-nav`: arrows and Today.
-3. `#tour-schedule-view`: Week/Day (skipped on phones).
-4. `#tour-schedule-choose` (admin, spectator, senior) or `#tour-schedule-children` (parent with >1 child).
-5. `#tour-schedule-grid`: lessons, now ring, non-school days.
-6. `#tour-schedule-add` + `#tour-schedule-delegate` (admin), `#tour-schedule-add` (senior with access).
+The steps come from `scheduleTourSteps(role)`, from **the role only**, as `rubricTourSteps` does, because `useTourSteps` builds every tour from the role alone.
 
-Add a `scheduleTourTargets.test.ts` like the existing `*TourTargets*` tests. Do not auto-start (ROLES_WITH_REAL_TOURS unchanged).
+- **Sometimes-missing targets** (no editing access, one child, a phone) stay mounted, empty and hidden.
+- A step whose element is hidden is skipped with the check in `tourValidation.ts`. If a step can't be skipped, it falls back to the heading and explains when the control appears.
+
+| Step | Target | Roles |
+|---|---|---|
+| 1 | `#tour-schedule-heading`: whose week this is | all |
+| 2 | `#tour-schedule-week-nav`: arrows, Today, the edge of the year | all |
+| 3 | `#tour-schedule-view`: Week/Day (skipped on phones) | all |
+| 4 | `#tour-schedule-choose`: class or teacher | admin, spectator, senior teacher |
+| 4 | `#tour-schedule-children` (skipped with one child) | parent |
+| 5 | `#tour-schedule-grid`: lessons, the now ring, non-school days; for staff, the Clash tag | all |
+| 6 | `#tour-schedule-add` (skipped without access) | admin, senior teacher |
+| 7 | `#tour-schedule-delegate` | admin |
+
+A `scheduleTourTargets.test.ts`, like the existing `*TourTargets*` tests, checks every target id and the role filter.
 
 ## 8. Gotchas
 
-- **Tests pin source text**: `sharedUsersReads.test.ts` (users-read call and invalidation in the schedule page; keep both lines in whichever file holds the Delegate panel and update the import path), `spectatorEditorPages.test.ts` (`role === 'institution_admin' && (` regex), `classPopulationWriters.test.ts` (schedule page as a `canGenerateSchedule` writer). Update the pins to the new file, never weaken them; compare with `flat()`.
-- **e2e**: `12-student-mobile` expects a day-strip group with 6 buttons, "<Day> (today)" and an h2 per day; `02-custom-mode-pickers` expects a Term select on Schedule (remove that assertion, keep it for Gradebook); `14-audit-activity` expects "Delegate Schedule Access" and "(Grant|Revoke) schedule access for X" (keep those names); `10-teacher-department` heading "Schedule".
-- **Sunday**: `todayKey` maps Sunday to Monday; the week view must use real dates instead.
-- **Term edges**: a week can span two terms or a term end; cells outside every term are non-school.
-- **Students in several classes** (`ClassMembership`): keep `takesSubject` filtering.
-- **CurrentTermContext**: Schedule stops writing it, so the other four pages no longer follow a Schedule change; say so in the CHANGELOG.
-- **Lesson colour**: use `subjectColor` (real app) rather than the demo's hash, so dashboard and page match; check contrast in dark mode.
-- **No drag and drop** (keyboard and phone users), as in the demo.
-- **600-line limit and Fallow**: new files small; run `npm run quality`.
-- **Time zone**: dates as local ISO strings (`isoDate`), never `toISOString().slice(0,10)`.
-- **Super admin** (`institutionId === '*'`): empty state, no queries.
+**Pinned tests.** Some tests pin source text. Move each pin to the new file; never weaken it, and compare with `flat()`.
 
-## 9. Work plan (one PR, minor version)
+- `sharedUsersReads.test.ts`: the users-read call and its invalidation. These move to `DelegateAccessPanel.tsx`.
+- `spectatorEditorPages.test.ts`: the `role === 'institution_admin' && (` regex.
+- `classPopulationWriters.test.ts`: the `canGenerateSchedule` writer.
 
-1. Pure modules + unit tests: `weekSchedule.ts`, `scheduleChoices.ts`, `scheduleUrl.ts` (rows, Saturday rule, term per date, non-school reasons, now, clashes, role choices, URL validation).
-2. `useWeekTimetable` + optional `termIds` on `useClassTimetable`; invalidation after FormModal saves/deletes of `timetable_slot`.
-3. Components (section 5) and the new `index.tsx`; delete `MobileSchedule.tsx` once its tests move.
-4. Restyle editing: "Add slot" (not "Add lesson") button for `canGenerateSchedule`; lesson card opens the existing update FormModal with a delete action; Delegate panel as a collapsible card.
-5. Tour (section 7) + target test.
-6. Update pinned tests and e2e specs (section 8); add an e2e for week arrows, Today, Day chips, parent chips, admin dropdowns.
-7. Docs (section 10). Then `npm test`, `npm run lint`, `npm run quality`, `npm run build`, spot e2e specs only.
+**e2e tests:**
+
+- `12-student-mobile` today checks:
+  - a "Day of the week" group of 6 buttons;
+  - `"<Day> (today)"` with `aria-pressed`;
+  - an h2 per day;
+  - no Term select for students;
+  - that no subject from another class's slots appears.
+
+  Update the button count (5, or 6 with Saturday) and the heading checks to the new markup. Keep the "(today)" name, `aria-pressed` and the no-other-class check.
+- `02-custom-mode-pickers` checks a Term select on Schedule. Remove that for Schedule; check a week in each time block instead; keep it for Gradebook.
+- `14-audit-activity` checks "Delegate Schedule Access" and "(Grant|Revoke) schedule access for X". Keep those names.
+- `10-teacher-department` checks the heading "Schedule".
+
+**Data limits:**
+
+- **Users rules:** teachers can't read the staff list (D13).
+- **Calendar scope:** only the active year's or blocks' terms and non-school days are loaded (D14).
+
+**Dates and terms:**
+
+- **Sunday:** `todayKey` maps Sunday to Monday. The week view uses real dates instead.
+- **Term edges:** a week can span two terms or a term's end.
+- **Time zone:** dates are local ISO strings (`isoDate`), never `toISOString().slice(0,10)`.
+
+**Page behaviour:**
+
+- **`CurrentTermContext`:** Schedule stops writing it, so the other four pages no longer follow a term chosen on Schedule. Say so in the CHANGELOG.
+- **Lesson colour:** `subjectColor`, so the dashboard and the page match. Check contrast in dark mode.
+- **No drag and drop**, for keyboard and phone users.
+- **Size:** keep new files small, and run `npm run quality`.
+- **Super admin** (`institutionId === '*'`): an empty state, with no queries.
+
+**Unchanged by this work:**
+
+- **Offline:** the Schedule page's code isn't kept on the device, so offline it shows "This page needs the internet".
+- **Mobile app:** the Flutter app reads the same `timetable_slots`, so there is no data change. Its handoff notes get the naming rule (D1) and the clash behaviour.
+- **Compliance:** `nextClassSlots`, already in the persisted cache, holds teacher names, while the compliance table says that cache holds no personal data. That wording needs a separate look.
+
+## 9. Delivery: three pull requests (D9)
+
+| PR | Contents | Suggested version |
+|---|---|---|
+| A | `weekSchedule.ts`, `scheduleChoices.ts`, `scheduleUrl.ts` with unit tests; `useWeekTimetable`; the optional term list on `useClassTimetable`; the FormModal cache refresh; doc pointers | patch (the cache refresh is visible) |
+| B | The new page and its components; editing restyled with the department limit; the Delegate panel moved; `MobileSchedule` and the Term picker removed; pins and e2e updated, plus a new e2e for the week page; docs | minor |
+| C | The tour, its button, the target test, docs | minor |
+
+Before each pull request, follow AGENTS.md:
+
+1. Find the next SMS number.
+2. Ask the owner about the version.
+3. Write CHANGELOG bullets under Unreleased.
+4. Run `npm run version:bump`.
+5. Run `npm run format:files` on the changed files only, then re-check the pins.
+
+Each pull request runs `npm test`, `npm run lint` and `npm run quality`; B also runs `npm run build`, because it deletes files.
 
 ## 10. Documentation
 
-- **New:** this spec (`docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`).
-- **BACKLOG.md** entries: Lessons feature + "Add lesson" button/dialog (D8); regular teacher class dropdown (D2); bell schedule / periods (D4); slot read-rule tightening (D6, under Security); dashboards to the new grid and dropping react-big-calendar (D7).
-- **Update at build time:** `SCHEDULE_GENERATION_PLAN.md` (pointer to this spec; Phase 2 status), `ISSUES_AND_GAPS.md` (#50 note, mobile schedule items, admin "my schedule" item at :790), `guides/USER_GUIDE.md` §2.12/3.3/4.2/5.2, `guides/SCHEDULE_VERIFICATION_GUIDE.md`, `README.md` schedule lines, `CHANGELOG.md` Unreleased bullets, `docs/ROLE`/sidebar docs if they describe the page.
-- **In-code comments** (future-proof): the Timetable vs Schedule rule at the top of `weekSchedule.ts`; why rows come from start times (no periods) and where a bell schedule would plug in; why the week decides the term; the cache keys and that week navigation is read-free; who may choose whose week (`scheduleChoices.ts`); that "Add slot" is the interim editor until the Lessons feature.
+- **This spec.**
+- **BACKLOG.md:** all entries are written.
+  - In "Schedule and timetable":
+    - personal timetables to print, download and share;
+    - automatic timetable generation;
+    - the Lessons feature with "Add lesson";
+    - class choice for regular teachers;
+    - bell schedule;
+    - the dashboards' calendars on the new grid.
+  - In Security: limiting who can read timetable slots.
+- **Update when built:**
+  - `SCHEDULE_GENERATION_PLAN.md` (a pointer to this spec; the Phase 2 status);
+  - `ISSUES_AND_GAPS.md`:
+    - the #50 note;
+    - the mobile schedule items;
+    - the admin "my schedule" item;
+    - D13's limit (teachers with no subject);
+  - `FIRESTORE_READ_CACHING_CALL_SITE_INVENTORY.md` (it gives `nextClassSlots` as 5 min, which is 10; add the new query);
+  - `BIGCALENDAR_AND_SKELETON_SPEC.md` (Schedule no longer shares the dashboards' calendar);
+  - `guides/USER_GUIDE.md` §2.12, 3.3, 4.2 and 5.2;
+  - `guides/SCHEDULE_VERIFICATION_GUIDE.md`;
+  - `project-overview/ROLE_PRIVILEGE_ANALYSIS.md` and `sms-role-specification-v1.md` (their Schedule rows);
+  - `README.md` (the schedule lines);
+  - `CHANGELOG.md` (Unreleased bullets);
+  - the mobile app's handoff notes;
+  - this spec's status.
+- **In-code comments**, written to stay true:
+  - the Timetable vs Schedule rule, at the top of `weekSchedule.ts`;
+  - why rows come from start times, and where a bell schedule would plug in;
+  - why the week decides the term, and why it is bounded;
+  - the student scope rule;
+  - the cache keys, why `scheduleSlots` stays in memory, and that week navigation is read-free;
+  - who may choose whose week, and where the senior teacher's list comes from (`scheduleChoices.ts`);
+  - the department limit on editing;
+  - that "Add slot" is the interim editor until the Lessons feature.
 
 ## 11. Verification
 
-- Unit: `npm test` (new pure-module tests, updated pins, `scheduleDay`/`nextClass` tests unchanged).
-- Lint/quality/build: `npm run lint`, `npm run quality`, `npm run build`.
-- e2e (only these, production quota): `12-student-mobile`, `02-custom-mode-pickers`, `14-audit-activity`, `10-teacher-department`, the new schedule spec.
-- Manual, per role on the Blue Mountain demo at 375/768/1440: arrows, Today, Week/Day, day chips, parent chips, admin/senior dropdowns, editing as admin and as senior with/without access, spectator read-only, a holiday week, a term boundary week, dark mode. Check reads in the Firebase usage view before/after.
+- **Unit:** `npm test` (the new pure-module tests, the moved pins; `scheduleDay` and `nextClass` tests unchanged).
+- **Lint, quality and build:** `npm run lint`, `npm run quality`, `npm run build`.
+- **e2e** (only these, because they use the production quota): `12-student-mobile`, `02-custom-mode-pickers`, `14-audit-activity`, `10-teacher-department`, `01-academic-mode-regression`, and the new schedule spec.
+- **By hand,** for each role on the Blue Mountain demo at 375, 768 and 1440 px, in light and dark mode:
+  - arrows, Today, Week and Day;
+  - the day chips (today and selected told apart);
+  - the parent's two children;
+  - a student in several classes, who sees no other class's subjects;
+  - the admin's and senior teacher's dropdowns, including another department's teacher in the senior list;
+  - a holiday week, a term-boundary week, and the first and last weeks (arrows disabled, note shown);
+  - a partial-overlap clash (staff see the tag, the student doesn't);
+  - Saturday shown when one slot uses it;
+  - editing as admin, as a senior teacher with and without access (and on another department's slot), and as spectator (no controls);
+  - after an edit, the student's dashboard updates at once.
+- **Reads:** compare Firestore reads in the usage view before and after.
+
+## 12. Revision history
+
+**2026-11-27, first version.** Decisions D1–D8, built from the live demo and a read of the code.
+
+**2026-11-27, revised after a review.**
+
+- **New decisions:**
+  - D9: three pull requests;
+  - D10: the Clash tag for staff only;
+  - D11: the full list of extras;
+  - D12: personal timetables and generation in BACKLOG;
+  - D13: the senior teacher's list from subjects, because of the users rules;
+  - D14: the week range bounded to the active year or blocks, because of what the calendar loads;
+  - D15: the merged student week.
+- **New rules:**
+  - student and parent scope, tested;
+  - clashes by overlapping times;
+  - the row-end tie-break and gap rows;
+  - Saturday per calendar mode;
+  - natural class order;
+  - the department limit on editing;
+  - day-chip states;
+  - the no-term empty state.
+- **Changes:**
+  - `scheduleSlots` stays in memory only (privacy);
+  - the tour is built from the role only, with handling for missing targets;
+  - the e2e notes corrected;
+  - delivery is three pull requests;
+  - the BACKLOG list marked as written;
+  - the missing docs added;
+  - read figures marked as estimates;
+  - private source paths replaced by the live demo URL.
