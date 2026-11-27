@@ -17,6 +17,7 @@ _Nothing yet._
 **Added**
 
 - A public landing page for the system, ready behind a switch and **off for everyone** until launch. When switched on, the home address shows a page that introduces the system to schools, with a link to the demo school and to sign in. It works with a keyboard and screen readers, without JavaScript, with reduced motion, in light and dark, on phones (swipe through the features), tablets and very large screens, in Chrome, Edge, Firefox and Safari.
+- Scroll effects on the landing page: the opening picture shrinks into a card, the three set-up steps stack on top of each other, the privacy cards slide in one after another, and the closing card grows into view. All of them stay still for visitors who ask their device for reduced motion.
 
 **Changed**
 

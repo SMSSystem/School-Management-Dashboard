@@ -11,7 +11,7 @@ Working name on the page: Scholarch (one constant, `PRODUCT_NAME` in `src/landin
 | Switch | `vite.config.ts` (`landingEnabled`) | Reads `VITE_LANDING_ENABLED === "true"` at build time. Off: only `index.html` is built. On: `landing.html` is built too. |
 | Build step | `scripts/landingBuild.mjs` | Always writes the app a second time as `dist/app.html`. When on, renders the landing page to HTML on the build machine and writes it as `dist/index.html`. |
 | Hosting | `vercel.json` | Vercel serves a real file before any rewrite, so `/` is always `dist/index.html`. Every other path is rewritten to `/app.html`. |
-| Service worker | `src/sw.ts`, `src/lib/serviceWorker/precacheSelection.ts` | App page loads get the stored `app.html`. `/` is fetched from the network first and falls back to the stored `index.html` offline. Only the landing page's stylesheet is kept, never its code. |
+| Service worker | `src/sw.ts`, `src/lib/serviceWorker/precacheSelection.ts` | App page loads get the stored `app.html`. `/` is fetched from the network first and falls back to the stored `index.html` offline, or after 4 seconds on a connection that hangs. Only the landing page's stylesheet is kept, never its code. |
 | Page shell | `landing.html` | The HTML around the page: meta tags, font preloads, the boot script, `<noscript>`, and the slot the build fills. |
 | Boot script | `public/landing-boot.js` | Runs before paint: adds `js` to `<html>`, applies the saved theme, redirects a signed-in visitor to `/login`. |
 | Page | `src/landing/` | `LandingPage.tsx`, `components/`, `content.ts` (all copy), `landing.css` (all styles), `theme.ts`, `entry-server.tsx` (build), `main.tsx` (browser). |
@@ -73,6 +73,7 @@ The landing page goes live in its own pull request (the "launch PR"). **Copy thi
 
 **Checks**
 - [ ] `npm run test:e2e:landing` passes (Chromium, Firefox, WebKit)
+- [ ] The feature list is a tab stop only where it scrolls sideways (touch phones), not on desktop (`docs/BACKLOG.md`, Accessibility)
 - [ ] Checked by hand on a real phone (iOS Safari and Android Chrome), with a screen reader (VoiceOver or TalkBack) and with reduced motion on
 - [ ] Lighthouse (or similar) on the deployed page: no accessibility or SEO errors
 ```
@@ -92,7 +93,7 @@ Target: **WCAG 2.2 AA**. Checked by `e2e/landing/landing.spec.ts` (axe, light an
   - Links to other sites say "(opens in a new tab)" (`OutsideLink`).
   - The phone bottom bar is `inert` while hidden.
 - **No JavaScript:** the full page, all links, a working menu (`<details>`), and colours that follow the device's light or dark setting. A `<noscript>` note says so. The theme switch, swipe buttons and bottom bar are hidden.
-- **Reduced motion:** every animation and transition runs only under `prefers-reduced-motion: no-preference`, with a final rule stopping anything left. Smooth scrolling is off too.
+- **Reduced motion:** every animation and transition runs only under `prefers-reduced-motion: no-preference`: the effects in `landing.css` sit inside that media query, and the hover colour fades in the components use Tailwind's `motion-safe:`. A final rule in `landing.css` stops anything added later without a guard (durations, delays and smooth scrolling). The swipe buttons scroll without animation too.
 - **Touch** (`pointer: coarse`):
   - Below 64rem the features become a horizontal swipe strip (`scroll-snap-type: x mandatory`).
   - Targets are at least 44px.
