@@ -29,8 +29,9 @@ Shared with the rest of the app: `src/lib/publicLinks.ts` (demo and designer add
 
 ## Running it
 
-- **Development:** `npm run dev`, then open `/landing.html`. The page renders in the browser (no prerendering in dev).
-- **Production build with the page on:** set `VITE_LANDING_ENABLED=true`, then `npm run build` and `npm run preview`; `/` is the landing page.
+- **Switching it on locally:** put `VITE_LANDING_ENABLED="true"` in `.env.local` (or `.env.development` for `npm run dev` only, `.env.production` for builds only). `vite.config.ts` reads it with Vite's `loadEnv`, so the `.env` files work; a real environment variable (Vercel's, or one set in the shell) takes precedence. Restart `npm run dev` after changing it.
+- **Development:** with the flag on, `npm run dev` shows the landing page at `/` (scripts/landingBuild.mjs, `landingDevRoot`); `/login`, `/dashboard` and every other path are the app as usual. The page renders in the browser (no prerendering in dev). With the flag off, `/` is the app, and the landing page can still be opened at `/landing.html`.
+- **Production build with the page on:** with the flag on, `npm run build` then `npm run preview`; `/` is the prerendered landing page. Note: `vite preview` answers unknown paths with `dist/index.html`, so `/login` there shows the landing page; on Vercel the rewrite sends it to `app.html`.
 - **Checks:** `npm run test:e2e:landing` builds with the page on, serves `dist/` on port 4180, and runs `e2e/landing/landing.spec.ts` in Chromium, Firefox and WebKit. It reads nothing from Firebase.
 
 ## Deploying and launching
