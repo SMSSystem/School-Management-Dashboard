@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useOwnClasses } from '@/hooks/useOwnClasses';
-import { useClassTimetable } from '@/hooks/useClassTimetable';
-import { upcomingClasses, type UpcomingClass } from '@/lib/nextClass';
+import { useMemo } from "react";
+import { useMinuteClock } from "@/hooks/useMinuteClock";
+import { useOwnClasses } from "@/hooks/useOwnClasses";
+import { useClassTimetable } from "@/hooks/useClassTimetable";
+import { upcomingClasses, type UpcomingClass } from "@/lib/nextClass";
 
 // The signed-in student's next few classes, for the dashboard card. The class's
 // timetable comes from useClassTimetable (one cached read, no live listener);
@@ -12,17 +13,17 @@ export function useNextClass(limit = 4): {
   error: boolean;
 } {
   const own = useOwnClasses();
-  const { slots, termRanges, nonSchoolRanges, loading, error } = useClassTimetable(own);
+  const { slots, termRanges, nonSchoolRanges, loading, error } =
+    useClassTimetable(own);
 
   // Re-evaluate "next" as time passes (a class ends, the next one starts).
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const now = useMinuteClock();
 
   const classes = useMemo(
-    () => (slots ? upcomingClasses(slots, termRanges, nonSchoolRanges, now, limit) : []),
+    () =>
+      slots
+        ? upcomingClasses(slots, termRanges, nonSchoolRanges, now, limit)
+        : [],
     [slots, termRanges, nonSchoolRanges, now, limit],
   );
 
