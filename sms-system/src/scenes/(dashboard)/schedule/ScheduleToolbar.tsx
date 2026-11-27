@@ -43,7 +43,10 @@ export default function ScheduleToolbar(props: Props) {
   return (
     <div className="flex flex-col gap-3">
       {choices.canChoose && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          id="tour-schedule-choose"
+          className="flex flex-wrap items-center gap-2"
+        >
           <span className="text-sm text-gray-500 dark:text-gray-400">
             {SCHEDULE_TEXT.show}
           </span>
@@ -74,7 +77,10 @@ export default function ScheduleToolbar(props: Props) {
           </select>
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        id="tour-schedule-week-nav"
+        className="flex flex-wrap items-center gap-2"
+      >
         <button
           type="button"
           className={ICON_BTN}

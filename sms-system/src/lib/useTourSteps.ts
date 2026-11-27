@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { fetchAcademicYears } from '@/hooks/useInstitutionAcademicCalendar';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 import { rubricTourSteps } from '@/lib/rubricTourSteps';
+import { scheduleTourSteps } from '@/lib/scheduleTourSteps';
 
 const stub: Step[] = [
   {
@@ -371,6 +372,7 @@ export function useTourSteps(institutionId: string | null | undefined): {
       { tour: 'gradebook', steps: gradebookSteps },
       { tour: 'report_builder', steps: reportBuilderSteps },
       { tour: 'rubrics', steps: rubricTourSteps(role) },
+      { tour: 'schedule', steps: scheduleTourSteps(role) },
       { tour: 'super_admin', steps: stub },
       { tour: 'senior_teacher', steps: stub },
       { tour: 'regular_teacher', steps: stub },
