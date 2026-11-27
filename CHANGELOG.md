@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.66.0"></a>
 <details open>
-<summary><strong>v2.66.0</strong> · 2026-11-27 · Schedule Page Tour</summary>
+<summary><strong>v2.66.0</strong> · 2026-11-27 · Schedule Page Tour (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/130">#130</a>)</summary>
 
 **Added**
 
