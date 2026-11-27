@@ -114,6 +114,50 @@ The first offline release keeps a teacher's unsent work safe when the connection
 - **Why it waits:** it does not block anyone, and the landing page is not live yet.
 - **Starts when:** before the landing page goes live (it is on the launch checklist in `docs/miscellaneous-specs/LANDING_PAGE_SPEC.md`).
 
+## Schedule and timetable
+
+### Personal timetables to print, download and share
+
+- **What:** a timetable for each student, built from their class or classes and only the subjects they take, laid out as a printable weekly grid (days across, times down, rooms and teachers). Everyone can print it or save it as a PDF or an image for the timetables they may view: students their own, parents each child's, teachers their own teaching week (senior teachers any they may view), and admins and spectators any class's or teacher's, possibly a whole class or year at once.
+- **Why it waits:** the Schedule page redesign (`docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`) comes first, and its week builder (`lib/schedule/weekSchedule.ts`) is what the export would draw from. It also needs decisions on the paper layout (A4 portrait or landscape, one week or the term's pattern), on whether exports carry the school's logo, and on bulk export cost (a whole year means many reads at once).
+- **Needs:** reuse the app's existing PDF tooling (`@react-pdf/renderer`, as the attendance, report card and rubric PDFs do) loaded on demand so it stays out of the main bundle; an image export (PNG) and a print stylesheet; no new data, since it reads the same `timetable_slots`.
+- **Starts when:** the redesign has shipped, or a school asks for printed timetables at the start of a term.
+
+### Automatic timetable generation
+
+- **What:** the system proposes the term's `timetable_slots` itself: it places each class's subjects for the right number of lessons a week, so that no teacher, class or room is booked twice, within the school's days and hours. An admin reviews the proposal, changes what they want and saves it; students' personal timetables then follow from it.
+- **Why it waits:** this is a constraint-solving problem (teacher availability, lessons a week per subject, rooms, double lessons, part-time staff), and the app has no periods or bell schedule yet, which a generator would need. Running a solver in the browser is possible but heavy; Cloud Functions are not on the free tier. Saving a whole term at once is a large batch of writes, to be checked against the daily free-tier limit.
+- **Needs:** a bell schedule (periods and breaks) per school; each subject's lessons a week per class (subjects already carry a frequency); teacher availability; a review step before anything is saved; and a decision on whether generation replaces or merges with slots already entered.
+- **Starts when:** schools say entering slots by hand takes too long, or the bell schedule has been built.
+
+### The Lessons feature, with "Add lesson" on the Schedule
+
+- **What:** a Lessons feature, separate from Lesson Notes and from the planned Lesson Plans, which would own the Schedule's "Add lesson" button and dialog, as the SMS Demo shows them. Until then the Schedule keeps "Add slot", the timetable slot form it already has.
+- **Why it waits:** nobody has decided what a lesson is beyond a timetable slot: whether it is a dated record, how it relates to slots, lesson notes and attendance, and who creates it. The old `/dashboard/list/lessons` placeholder and its `lessons` rules stay untouched until then.
+- **Needs:** a brainstorm, research and a spec, then the usual build, tests, review, merge and deploy. The Schedule's editor would then switch from "Add slot" to "Add lesson".
+- **Starts when:** the Schedule page redesign (`docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`) has shipped and the owner starts the Lessons brainstorm.
+
+### Class choice on the Schedule for regular teachers
+
+- **What:** let a regular teacher see the timetable of the classes they teach, not only their own teaching week, through a class dropdown limited to those classes.
+- **Why it waits:** the redesign gives regular teachers their own week only, like the SMS Demo. Whether the dropdown is worth it, and how to find "the classes they teach" cheaply (subjects' teachers, homeroom, timetable slots), needs looking into.
+- **Needs:** a feasibility check of where the taught-classes list comes from and what it costs in reads; then a change to the Schedule's role choices (`lib/schedule/scheduleChoices.ts`) and its tests.
+- **Starts when:** the redesign has shipped, or teachers ask to see their classes' full timetables.
+
+### Bell schedule (periods and breaks)
+
+- **What:** a school-wide list of periods and breaks (Period 1 from 8:30 to 9:15, Break, Lunch) that timetable slots snap to, so the Schedule's rows read "Period 1" and breaks show between them, as in the SMS Demo.
+- **Why it waits:** today each slot has its own start time and length, and the redesign builds its rows from those times. Periods need a new per-school setting, its rules, a way to move existing slots onto periods, and changes to the slot form.
+- **Needs:** a settings document per school and its rules, a migration or a fallback for slots that fit no period, form changes, and an update to the row logic in `lib/schedule/weekSchedule.ts`. Automatic timetable generation also needs it.
+- **Starts when:** schools ask for period numbers, or automatic generation is started.
+
+### The dashboards' week calendars on the new Schedule grid
+
+- **What:** replace react-big-calendar on the parent, regular-teacher and senior-teacher dashboards and the teacher detail page with the Schedule's new week grid, then remove the react-big-calendar dependency.
+- **Why it waits:** the redesign builds the grid for the Schedule page first. Moving four pages and their tests at the same time would make that change much larger.
+- **Needs:** the grid used in a compact form on each page, their tests updated, and a bundle check once the dependency is gone.
+- **Starts when:** the redesign has shipped.
+
 ## Security
 
 ### Tighten access to large-file storage and its usage counters
@@ -125,3 +169,10 @@ The first offline release keeps a teacher's unsent work safe when the connection
 - **Needs:** a choice between the options, Realtime Database rules tests, and `firebase deploy --only database`. Probably a patch, or a minor if the upload flow changes. The details are in the internal security notes.
 - **Why it waits:** the right option depends on how sign-in and uploads should change, and it hasn't been designed yet.
 - **Starts when:** the owner picks an option.
+
+### Limit who can read timetable slots
+
+- **What:** today every signed-in member of a school can read all of its timetable slots, and the app limits students and parents to their own classes only in the browser (ISSUES_AND_GAPS #50). Tighten the rules so students read their own class's slots, parents their children's classes, and regular teachers their own.
+- **Why it waits:** it was kept out of the Schedule page redesign to keep that change free of rules. Each tightened read needs a rules `get()` per query, which costs a read, and the app's queries must match the rules exactly.
+- **Needs:** rules changes, rules tests, checks that every slot query (Schedule, dashboards, next-class card, grade tracking) still passes, and `firebase deploy --only firestore:rules`. Probably a patch.
+- **Starts when:** the redesign has shipped, or a security review asks for it.
