@@ -360,6 +360,8 @@ The Schedule page shows one week of a class's or a teacher's timetable on real d
 
 The page address keeps what you chose (class or teacher, week, view and day), so you can bookmark or share it with other staff.
 
+New to the page? **Take a tour** (beside the heading) walks you through it; it appears once the timetable is showing.
+
 ---
 
 ### 2.13 Lessons
@@ -692,6 +694,7 @@ Teachers can view lists of teachers, students, and parents at their institution.
 2. Use **‹** and **›** to move between weeks, **Today** to come back, and **Week** or **Day** to change the view (phones show Day). Holidays and breaks are greyed with their name, and the lesson on now has a ring.
 3. **Senior teachers** can also look at any class's or teacher's week under **Show**. The teacher list is made of the teachers named on subjects, so a teacher who teaches no subject isn't on it.
 4. A senior teacher given schedule access by the administrator also sees **Add slot**, and **Edit** and **Delete** on lessons whose teacher is in their own department.
+5. **Take a tour** (beside the heading) walks you through the page.
 
 ---
 
@@ -856,6 +859,7 @@ On a phone each note is a card showing its subject, class, teacher, and whether 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
 2. **Your timetable** shows this week's lessons across all your classes (only the subjects you take in an additional class), never other classes. The week decides the term, so there is nothing to pick.
 3. Use **‹** and **›** to move between weeks and **Today** to come back. On a phone, tap a day chip to see that day's lessons in time order: today's chip is underlined and says "(today)", and days with classes have a dot. Each lesson shows its subject, teacher and room, and the lesson on now is marked **On now**. Holidays show their name. On a larger screen you can also see the whole week as a grid.
+4. **Take a tour** (beside the heading) walks you through the page.
 
 ---
 
@@ -951,6 +955,7 @@ In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
 2. If you have more than one child linked, pick the child with the chips under **Showing:**. The page shows **Jordan's timetable** (your child's name): this week's lessons across all of their classes.
 3. Use **‹** and **›** to move between weeks and **Today** to come back. On a phone, tap a day chip to see that day's lessons in time order (today's chip is underlined, days with classes have a dot). On a larger screen you can also see the whole week as a grid. Holidays show their name.
+4. **Take a tour** (beside the heading) walks you through the page.
 
 ---
 
