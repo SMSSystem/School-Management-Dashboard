@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.63.0 · **Last updated:** 2026-11-26
+**Current version:** v2.64.0 · **Last updated:** 2026-11-26
 
 ## Unreleased
 
@@ -10,8 +10,26 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.63.0"></a>
+<a id="v2.64.0"></a>
 <details open>
+<summary><strong>v2.64.0</strong> · 2026-11-26 · Public Landing Page, Off Until Launch</summary>
+
+**Added**
+
+- A public landing page for the system, ready behind a switch and **off for everyone** until launch. When switched on, the home address shows a page that introduces the system to schools, with a link to the demo school and to sign in. It works with a keyboard and screen readers, without JavaScript, with reduced motion, in light and dark, on phones (swipe through the features), tablets and very large screens, in Chrome, Edge, Firefox and Safari.
+
+**Changed**
+
+- Every app page is now served from a second copy of the app's page (app.html) so the home address can become the landing page later. Nothing changes for users while the landing page is off.
+
+**Deploy notes**
+
+- No Firebase deploy. Leave `VITE_LANDING_ENABLED` unset in production; set it to `true` on a preview to try the landing page (needs a redeploy). The service worker now answers app pages with `app.html`; devices update to it the usual way.
+
+</details>
+
+<a id="v2.63.0"></a>
+<details>
 <summary><strong>v2.63.0</strong> · 2026-11-26 · You're Leaving Check for Outside Links (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/126">#126</a>)</summary>
 
 **Added**
