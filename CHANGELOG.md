@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.64.0"></a>
 <details open>
-<summary><strong>v2.64.0</strong> · 2026-11-26 · Public Landing Page, Off Until Launch</summary>
+<summary><strong>v2.64.0</strong> · 2026-11-26 · Public Landing Page, Off Until Launch (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/127">#127</a>)</summary>
 
 **Added**
 
