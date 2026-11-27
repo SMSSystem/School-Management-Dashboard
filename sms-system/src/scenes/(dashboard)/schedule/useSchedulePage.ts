@@ -120,18 +120,21 @@ function useMembership(
   return null;
 }
 
-/** Who may be shown (spec §4): only the people lists each role uses are loaded. */
+/** Who may be shown (spec §4), and whether those lists are still loading: only the lists each role uses are loaded. */
 function useChoices(studentId: string | null) {
   const { user, role, displayName } = useAuth();
   const isAdminLike = role === "institution_admin" || role === "spectator";
   const isSenior = role === "senior_teacher";
   const live = DATA_MODE === "live";
-  const { data: rawClasses } = useInstitutionClasses({
-    enabled: isAdminLike || isSenior,
+  const { data: rawClasses, isLoading: classesLoading } = useInstitutionClasses(
+    { enabled: isAdminLike || isSenior },
+  );
+  const { staff, isLoading: staffLoading } = useTeachingStaff({
+    enabled: live && isAdminLike,
   });
-  const { staff } = useTeachingStaff({ enabled: live && isAdminLike });
-  const { data: rawSubjects } = useInstitutionSubjects({ enabled: isSenior });
-  return useMemo(
+  const { data: rawSubjects, isLoading: subjectsLoading } =
+    useInstitutionSubjects({ enabled: isSenior });
+  const choices = useMemo(
     () =>
       scheduleChoices({
         role,
@@ -144,6 +147,10 @@ function useChoices(studentId: string | null) {
       }),
     [role, user?.uid, displayName, rawClasses, staff, rawSubjects, studentId],
   );
+  return {
+    choices,
+    loading: classesLoading || staffLoading || subjectsLoading,
+  };
 }
 
 /**
@@ -152,7 +159,7 @@ function useChoices(studentId: string | null) {
  * edits. The senior teacher's flag is one cached read of their own user document.
  */
 function useScheduleEditing() {
-  const { user, role, department } = useAuth();
+  const { user, role, departmentId } = useAuth();
   const isSenior = role === "senior_teacher";
   const { data: seniorMayEdit } = useQuery({
     queryKey: ["scheduleAccess", user?.uid ?? ""],
@@ -165,7 +172,7 @@ function useScheduleEditing() {
   });
   const mayEdit =
     role === "institution_admin" || (isSenior && seniorMayEdit === true);
-  const { teachers: deptTeachers } = useDepartmentTeachers(department, {
+  const { teachers: deptTeachers } = useDepartmentTeachers(departmentId, {
     enabled: isSenior && mayEdit,
   });
   const deptIds = useMemo(
@@ -241,7 +248,7 @@ export function useSchedulePage() {
     user?.uid,
     child.selectedChild?.uid,
   );
-  const choices = useChoices(studentId);
+  const { choices, loading: peopleLoading } = useChoices(studentId);
 
   // The URL state: whose week, which week, week or day.
   const [params, setParams] = useSearchParams();
@@ -266,6 +273,7 @@ export function useSchedulePage() {
     week: shown.week,
     rangeLabel: weekRangeLabel(state.weekStart, lastDay),
     loading: calendarLoading || shown.loading,
+    peopleLoading,
     error: shown.error,
     mayEdit: editing.mayEdit,
     canEditSlot: (slot: CardSlot) =>

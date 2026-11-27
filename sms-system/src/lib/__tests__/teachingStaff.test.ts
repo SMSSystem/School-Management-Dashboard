@@ -128,7 +128,7 @@ describe("the pickers use the shared staff list", () => {
     }
     const timetable = lf(timetableFormRaw);
     expect(timetable).toContain("useTeachingStaff({");
-    expect(timetable).toContain("useDepartmentTeachers(department, {");
+    expect(timetable).toContain("useDepartmentTeachers(departmentId, {");
     expect(flat(departmentTeachersRaw)).toContain(
       flat("['regular_teacher', 'senior_teacher']"),
     );

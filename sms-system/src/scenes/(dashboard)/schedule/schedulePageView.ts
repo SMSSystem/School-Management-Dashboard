@@ -43,6 +43,8 @@ export type EmptyInput = {
   bounds: DateRange | null;
   mode: CalendarMode;
   loading: boolean;
+  /** The class and teacher lists the role uses are still loading (admin, spectator, senior teacher). */
+  peopleLoading?: boolean;
   error: boolean;
 };
 
@@ -67,7 +69,10 @@ export function emptyState(input: EmptyInput): EmptyState | null {
     return muted(
       input.loading ? SCHEDULE_TEXT.loading : nothingActiveLabel(input.mode),
     );
-  if (!input.of) return muted(SCHEDULE_TEXT.nothingToShow);
+  if (!input.of)
+    return muted(
+      input.peopleLoading ? SCHEDULE_TEXT.loading : SCHEDULE_TEXT.nothingToShow,
+    );
   if (input.error) return { text: SCHEDULE_TEXT.loadError, tone: "error" };
   if (input.loading) return muted(SCHEDULE_TEXT.loading);
   return null;

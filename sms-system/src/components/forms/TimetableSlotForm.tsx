@@ -81,7 +81,7 @@ const TimetableSlotForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { user, role, institutionId, department } = useAuth();
+  const { user, role, institutionId, departmentId } = useAuth();
 
   const { data: rawTerms } = useInstitutionTerms();
   const terms = useMemo<DropdownItem[]>(() => {
@@ -101,12 +101,12 @@ const TimetableSlotForm = ({
   }, [rawSubjects]);
   // An admin picks from the shared cached teaching staff (hooks/useTeachingStaff.ts); a senior teacher is limited
   // to their own department and reads just that (the users rules allow no wider query for them).
-  const deptScoped = role === "senior_teacher" && !!department;
+  const deptScoped = role === "senior_teacher" && !!departmentId;
   const { staff } = useTeachingStaff({
     enabled: DATA_MODE === "live" && !deptScoped,
   });
   // The senior teacher's department teachers: one cached read, shared with the Schedule page's edit check.
-  const { teachers: deptTeachers } = useDepartmentTeachers(department, {
+  const { teachers: deptTeachers } = useDepartmentTeachers(departmentId, {
     enabled: deptScoped,
   });
   const teachers = useMemo<DropdownItem[]>(

@@ -203,7 +203,7 @@ describe("the page's reads and rules (source)", () => {
     );
     expect(hook).toContain(
       flat(
-        "useDepartmentTeachers(department, { enabled: isSenior && mayEdit })",
+        "useDepartmentTeachers(departmentId, { enabled: isSenior && mayEdit })",
       ),
     );
     expect(page).toContain(flat("page.canEditSlot(cell.slot) ?"));
@@ -289,6 +289,21 @@ describe("the page's title and empty states", () => {
       text: "Could not load the timetable. Please refresh and try again.",
       tone: "error",
     });
+  });
+
+  it("says Loading, not 'nothing to show', while the class and teacher lists load", () => {
+    expect(emptyState({ ...base, of: null, peopleLoading: true })?.text).toBe(
+      "Loading…",
+    );
+    expect(emptyState({ ...base, of: null })?.text).toBe(
+      "There is no class or teacher to show yet.",
+    );
+  });
+
+  it("never lets the department hook use AuthContext's department name", () => {
+    expect(flat(pageHookRaw)).not.toContain(
+      flat("useDepartmentTeachers(department,"),
+    );
   });
 
   it("notes the edge of the year beside a disabled arrow (D14)", () => {

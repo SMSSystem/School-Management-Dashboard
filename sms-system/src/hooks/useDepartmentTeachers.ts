@@ -8,26 +8,27 @@ import { REFERENCE_STALE_MS } from "@/lib/queryPolicies";
 export type DepartmentTeacher = { id: string; name: string };
 
 /**
- * A senior teacher's own department's teachers: the only teachers the users rules let them list. One cached read,
+ * A senior teacher's own department's teachers: the only teachers the users rules let them list (firestore.rules,
+ * `match /users/{uid}`: the department must be the reader's own departmentId, the id, never the name). One cached read,
  * shared by the slot form's teacher list and the Schedule page's edit check (a senior teacher may edit a slot only
  * when its teacher is in this list), so the rule lives in one place and opening the form costs no extra read.
  *
  * Kept in memory only (names): 'departmentTeachers' is not in lib/queryPersistence.ts's allow-list.
  */
 export function useDepartmentTeachers(
-  department: string | null | undefined,
+  departmentId: string | null | undefined,
   { enabled = true }: { enabled?: boolean } = {},
 ): { teachers: DepartmentTeacher[]; loading: boolean } {
   const { institutionId } = useAuth();
   const result = useQuery({
-    queryKey: ["departmentTeachers", institutionId, department ?? ""],
+    queryKey: ["departmentTeachers", institutionId, departmentId ?? ""],
     queryFn: async (): Promise<DepartmentTeacher[]> => {
       const snap = await getDocs(
         query(
           collection(db, "users"),
           where("institutionId", "==", institutionId),
           where("role", "in", ["regular_teacher", "senior_teacher"]),
-          where("departmentId", "==", department),
+          where("departmentId", "==", departmentId),
         ),
       );
       return snap.docs.map((d) => ({
@@ -40,7 +41,7 @@ export function useDepartmentTeachers(
       DATA_MODE === "live" &&
       !!institutionId &&
       institutionId !== "*" &&
-      !!department,
+      !!departmentId,
     staleTime: REFERENCE_STALE_MS,
   });
   return { teachers: result.data ?? [], loading: result.isLoading };

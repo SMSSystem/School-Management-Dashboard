@@ -85,7 +85,7 @@ describe("forms that take people from the shared lists", () => {
   it("the Timetable form keeps its own query only for a senior teacher’s department", () => {
     const src = flat(timetableFormRaw);
     expect(src).toContain(
-      flat("const deptScoped = role === 'senior_teacher' && !!department;"),
+      flat("const deptScoped = role === 'senior_teacher' && !!departmentId;"),
     );
     expect(src).toContain(
       flat(
@@ -94,10 +94,10 @@ describe("forms that take people from the shared lists", () => {
     );
     // The department query is the shared cached hook (also the Schedule page's edit check): one read for both.
     expect(src).toContain(
-      flat("useDepartmentTeachers(department, { enabled: deptScoped })"),
+      flat("useDepartmentTeachers(departmentId, { enabled: deptScoped })"),
     );
     expect(flat(departmentTeachersRaw)).toContain(
-      flat("where('departmentId', '==', department)"),
+      flat("where('departmentId', '==', departmentId)"),
     );
     expect(flat(departmentTeachersRaw)).toContain(
       "staleTime: REFERENCE_STALE_MS",

@@ -162,6 +162,7 @@ const SchedulePage = () => {
     bounds: calendar.bounds,
     mode: calendar.mode,
     loading: page.loading,
+    peopleLoading: page.peopleLoading,
     error: page.error,
   });
 
