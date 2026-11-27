@@ -348,11 +348,17 @@ The Academic Calendar sets up your school's academic year structure, including t
 
 ### 2.12 Schedule
 
-The Schedule page shows a weekly timetable view.
+The Schedule page shows one week of a class's or a teacher's timetable on real dates. The **timetable** is the weekly pattern of slots; the **schedule** is that pattern laid on the calendar, with holidays and breaks taken out.
 
-1. In the sidebar, click **Schedule** (under **TIMETABLE**).
-2. Navigate between weeks using the arrows at the top.
-3. Lesson blocks are displayed on their scheduled day and time.
+1. In the sidebar, click **Schedule** (under **TIMETABLE**). It opens on the first class (in natural order: Grade 2A before Grade 10A) and this week, or the next school week on a weekend or a break.
+2. Under **Show**, pick **A class** or **A teacher**, then the class or teacher.
+3. Use **‹** and **›** to move a week at a time, and **Today** to come back. The arrows stop at the first and last weeks of the active school year (or the active time blocks), with a note saying the timetable outside isn't available here. There is no Term picker: the week decides the term.
+4. Switch between **Week** (a grid with a row per start time) and **Day** (one day as a list, picked with the day chips). Phones always show Day.
+5. Holidays and breaks are greyed with their name. **Free time** marks a gap of 15 minutes or more. The lesson on now has a ring, and today's column is tinted. Lessons that overlap show a red **Clash** tag, and the footer counts the week's lessons and clashes.
+6. **Add slot** creates a timetable slot; each lesson has **Edit** and **Delete** buttons. A change shows on your own screen at once; others see it within ten minutes.
+7. **Delegate Schedule Access** (a collapsible panel) lets senior teachers create and edit slots, one toggle per teacher. Every grant and revoke is recorded in the Activity log.
+
+The page address keeps what you chose (class or teacher, week, view and day), so you can bookmark or share it with other staff.
 
 ---
 
@@ -682,9 +688,10 @@ Teachers can view lists of teachers, students, and parents at their institution.
 
 ### 3.3 Schedule
 
-1. In the sidebar, click **Schedule** (under **TIMETABLE**).
-2. The weekly calendar displays your assigned lessons.
-3. Navigate between weeks using the arrows at the top.
+1. In the sidebar, click **Schedule** (under **TIMETABLE**). It opens on your own teaching week, with each lesson's class and room.
+2. Use **‹** and **›** to move between weeks, **Today** to come back, and **Week** or **Day** to change the view (phones show Day). Holidays and breaks are greyed with their name, and the lesson on now has a ring.
+3. **Senior teachers** can also look at any class's or teacher's week under **Show**. The teacher list is made of the teachers named on subjects, so a teacher who teaches no subject isn't on it.
+4. A senior teacher given schedule access by the administrator also sees **Add slot**, and **Edit** and **Delete** on lessons whose teacher is in their own department.
 
 ---
 
@@ -847,8 +854,8 @@ On a phone each note is a card showing its subject, class, teacher, and whether 
 ### 4.2 Your Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
-2. Pick the term at the top if one isn't already selected. Your class's weekly timetable is displayed (only your own class, not other classes).
-3. On a phone, tap a day in the **Mon–Sat strip** to see that day's classes in time order. Today is underlined and days with classes have a dot. Each class shows its time, subject, teacher, and room, and the class under way is marked **Now** and the one after it **Next**. On a larger screen the whole week is shown as a grid.
+2. **Your timetable** shows this week's lessons across all your classes (only the subjects you take in an additional class), never other classes. The week decides the term, so there is nothing to pick.
+3. Use **‹** and **›** to move between weeks and **Today** to come back. On a phone, tap a day chip to see that day's lessons in time order: today's chip is underlined and says "(today)", and days with classes have a dot. Each lesson shows its subject, teacher and room, and the lesson on now is marked **On now**. Holidays show their name. On a larger screen you can also see the whole week as a grid.
 
 ---
 
@@ -942,8 +949,8 @@ In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to
 ### 5.2 Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
-2. If you have more than one child linked, pick the child at the top; then pick the term. Your child's class timetable is displayed.
-3. On a phone, tap a day in the **Mon–Sat strip** to see that day's classes in time order (today is underlined, days with classes have a dot). On a larger screen the whole week is shown as a grid.
+2. If you have more than one child linked, pick the child with the chips under **Showing:**. The page shows **Jordan's timetable** (your child's name): this week's lessons across all of their classes.
+3. Use **‹** and **›** to move between weeks and **Today** to come back. On a phone, tap a day chip to see that day's lessons in time order (today's chip is underlined, days with classes have a dot). On a larger screen you can also see the whole week as a grid. Holidays show their name.
 
 ---
 

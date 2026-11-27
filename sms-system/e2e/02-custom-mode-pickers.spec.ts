@@ -73,14 +73,21 @@ test('Gradebook: Term dropdown lists both time blocks', async ({ page, context }
   await assertListsBothBlocks(page.locator('#tour-gradebook-term select'));
 });
 
-test('Schedule: Term dropdown lists both time blocks', async ({ page, context }) => {
+// The redesigned Schedule page has no Term dropdown: the week decides the time block (spec D5), and every active
+// block's lessons show in the week they run (D16). So instead of a picker listing both blocks, check that the page
+// opens on a week with no Term picker, and that it does not collapse to one block: in custom mode the "nothing
+// active" wording is never shown while both blocks are active.
+test('Schedule: no Term picker; the week follows the active time blocks', async ({ page, context }) => {
   await forceLiveData(context);
   await login(page, { institutionLabel: INSTITUTION_NAME!, email: ADMIN_EMAIL!, password: ADMIN_PASSWORD! });
   await dismissTourIfPresent(page);
 
   await page.goto('/dashboard/schedule');
   await dismissTourIfPresent(page);
-  await assertListsBothBlocks(selectContainingOption(page, BLOCK_A_NAME));
+  await expect(page.getByRole('button', { name: 'Next week' })).toBeVisible({ timeout: 20_000 });
+  await expect(selectContainingOption(page, BLOCK_A_NAME)).toHaveCount(0);
+  await expect(page.getByLabel('Term')).toHaveCount(0);
+  await expect(page.getByText('No time block is active')).toHaveCount(0);
 });
 
 test('General Attendance: Time Block selector lists both blocks and scopes the class list', async ({ page, context }) => {

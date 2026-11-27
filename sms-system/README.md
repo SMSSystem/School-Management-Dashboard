@@ -28,7 +28,7 @@ The SMS is a dashboard-driven administrative tool for schools. A `super_admin` o
 
 The platform has grown well beyond the original MVP. List pages are connected to Firestore via real-time `onSnapshot` listeners across every resource (users, academic structure, schedule, attendance, grading, and disciplinary records). The following features have been built end-to-end:
 
-- **Schedule management** — timetable slot creation with teacher-conflict detection, delegated access for senior teachers
+- **Schedule** — a week and day view of any class's or teacher's timetable on real dates (holidays, breaks and clashes shown, no Term picker), each student's own merged week, timetable slot creation with teacher-conflict detection, and delegated access for senior teachers
 - **Attendance** — General Attendance Register, Subject Attendance Register, Attendance Summary Register (gridsheet, PDF export), and role-scoped views (`/attendance/general`, `/attendance/subject`, `/attendance/gridsheet`, `/attendance/my`, `/attendance/child`)
 - **Report cards** — institution profile wizard (logo/signature/grading-system setup), report card comments, full report card generation + signed PDF export
 - **Gradebook** — editable grade grid per class/subject/term
@@ -60,7 +60,7 @@ The following represents the target completion state beyond the current build:
 
 - **Lessons, Events and Announcements** — build the features behind the placeholder dialogs
 - **BigCalendar integration** — role dashboards use `react-big-calendar` to render timetable slots as calendar events; requires `enrolledStudentIds[]` population in `ClassForm`
-- **Phase 2 schedule features** — occurrence expansion (day-by-day event generation from timetable slots), room conflict detection
+- **Phase 2 schedule features** — room conflict detection, a bell schedule, and printable personal timetables (BACKLOG "Schedule and timetable"); the Schedule page already lays slots on real dates
 - **Server-side pagination** — replace client-side `.slice()` with Firestore `startAfter` cursor pagination across all list pages
 - ~~**Profile photo upload** — Firebase Storage integration~~ — built without Firebase Storage (photos are Firestore documents); the `photo_update` activity log entry exists
 - **Messages / notifications** — in-app messaging between roles

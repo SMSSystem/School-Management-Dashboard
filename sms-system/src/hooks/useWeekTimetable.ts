@@ -6,7 +6,6 @@ import { DATA_MODE } from "@/lib/data";
 import { institutionCollection } from "@/lib/paths";
 import { REFERENCE_STALE_MS } from "@/lib/queryPolicies";
 
-// fallow-ignore-next-line unused-type -- the Schedule page (redesign PR B) is its first consumer
 export type WeekTimetableSlot = TimetableSlotDocument & { id: string };
 
 type WeekOf = { by: "class" | "teacher"; id: string };
@@ -54,7 +53,6 @@ async function fetchWeekSlots(
  * Kept in memory only: 'scheduleSlots' is deliberately not in lib/queryPersistence.ts's allow-list. Slots carry
  * teacher names, and the compliance storage table describes that sessionStorage cache as holding no personal data.
  */
-// fallow-ignore-next-line unused-export -- the Schedule page (redesign PR B) is its first consumer
 export function useWeekTimetable(
   of: WeekOf | null,
   termIds: string[],

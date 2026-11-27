@@ -55,7 +55,7 @@ export type WeekDay = {
   key: DayKey;
   /** "Mon". */
   weekday: string;
-  /** "Nov 23". */
+  /** "23 Nov". */
   label: string;
   today: boolean;
   /** The terms or blocks that teach on this date. */
@@ -279,7 +279,7 @@ function weekDays(
       date,
       key: DAY_KEYS[i],
       weekday: WEEKDAY_SHORT[d.getDay()],
-      label: `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`,
+      label: `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`,
       today: date === today,
       ...dayInfo(date, calendar),
     };
@@ -404,6 +404,35 @@ function showsSaturday(
     calendar.terms.some((t) => t.schoolWeekDays.includes(6)) ||
     slots.some((s) => (s.days ?? []).includes("sat"))
   );
+}
+
+/** One line of the day view: a time row with that day's lessons, or a free stretch between them. */
+export type DayItem<S extends ScheduleSlot> =
+  | { kind: "lessons"; row: WeekRow; cells: WeekCell<S>[] }
+  | { kind: "gap"; start: string; end: string };
+
+/**
+ * The day view of one date: only the rows that have lessons on that day, with "Free time" between them when no
+ * lesson of that day is still running (the same rule as the week's gap rows, applied to one day).
+ */
+export function dayItems<S extends ScheduleSlot>(
+  week: WeekSchedule<S>,
+  date: string,
+): DayItem<S>[] {
+  const items: DayItem<S>[] = [];
+  let busyUntil: number | null = null;
+  for (const row of week.rows) {
+    if (row.kind !== "lessons") continue;
+    const cells = week.at(date, row.start);
+    if (cells.length === 0) continue;
+    const start = minutesOf(row.start) ?? 0;
+    if (busyUntil !== null && start - busyUntil >= GAP_ROW_MINUTES)
+      items.push({ kind: "gap", start: hhmmOf(busyUntil), end: row.start });
+    const ends = cells.map((c) => minutesOf(c.end) ?? start);
+    busyUntil = Math.max(busyUntil ?? start, ...ends);
+    items.push({ kind: "lessons", row, cells });
+  }
+  return items;
 }
 
 /** Build one week of a timetable. `slots` are the slots of the viewed class, teacher or student. */

@@ -2,6 +2,8 @@
 
 > Issue #4 (Option B) and Issue #10 from `ISSUES_AND_GAPS.md`.  
 > Written: 2026-06-15. Do NOT push (`git push`) any commits produced by this work.
+>
+> **Update 2026-11-27:** the Schedule page no longer shares the dashboards' calendar. It has its own week and day views (`scenes/(dashboard)/schedule/`); see `docs/miscellaneous-specs/SCHEDULE_PAGE_REDESIGN_SPEC.md`. The dashboards keep `BigCalender` (moving them to the new grid is a BACKLOG entry).
 
 ---
 

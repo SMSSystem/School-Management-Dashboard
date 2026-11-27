@@ -80,7 +80,8 @@
 - `scenes/(dashboard)/report-cards/index.tsx:174-178` → `where(role==student)`, `where(institutionId==)`. useEffect. Student dropdown for admin generate panel.
 - `scenes/(dashboard)/report-cards/index.tsx:287-292` → `where(institutionId==)`, `where(classId==batchClassId)`, `where(role==student)`. One-off, inside `handleBatchGenerate`. Class roster for batch report-card generation.
 - `scenes/(dashboard)/list/gradebook/index.tsx:405-410` → `where(institutionId==)`, `where(role==student)`, `where(classId==selectedClassId)`. One-off, inside `loadGradebook` callback (fired on selection change, not a bare useEffect body). Students for the grade grid.
-- `scenes/(dashboard)/schedule/index.tsx:64-68` → `where(institutionId==)`, `where(role==senior_teacher)`. One-off, inside useEffect (admin-only branch). Senior-teacher list for "Delegate Schedule Access" panel.
+- `scenes/(dashboard)/schedule/DelegateAccessPanel.tsx` → the shared cached users list (`useInstitutionUsers`), filtered to senior teachers in the browser. Admin only. Senior-teacher list for the "Delegate Schedule Access" panel (moved out of the page in the Schedule redesign).
+- `hooks/useDepartmentTeachers.ts` → `where(institutionId==)`, `where(role in [regular_teacher, senior_teacher])`, `where(departmentId==)`. One cached `getDocs` (`departmentTeachers`, 10 min, memory only), shared by the slot form's teacher list and the Schedule page's edit check for a senior teacher.
 - `scenes/(dashboard)/import/index.tsx:341-343` (`fetchCandidatesFor`) → `where(role==student)`, `where(institutionId==)`. One-off helper called from step-transition handlers (not useEffect). Name-resolution candidates for Results/MDDS import.
 - `scenes/(dashboard)/import/index.tsx:407-409` (`fetchGeneralAttendanceCandidates`) → same shape. One-off helper.
 - `scenes/(dashboard)/import/index.tsx:491-493` (`fetchSubjectAttendanceCandidates`) → same shape. One-off helper.
@@ -109,7 +110,7 @@
 - `components/forms/AssignmentForm.tsx:104-107` — useEffect (create mode only). Prefills own name for locked-teacher display.
 - `components/forms/ExamForm.tsx:112-115` — useEffect (create mode only). Same as AssignmentForm.
 - `components/forms/AdminCreateUserForm.tsx` — none direct on `users/{uid}` (creation only, no read of the created doc).
-- `scenes/(dashboard)/schedule/index.tsx:50-52` — one-off, inside useEffect (Promise-then, not awaited sequentially). Fetches `userDoc` to evaluate `canGenerateSchedule`.
+- `scenes/(dashboard)/schedule/useSchedulePage.ts` — one cached `getDoc` of the signed-in senior teacher's own user document (`scheduleAccess`, 10 min, memory only) to read `canGenerateSchedule`. Senior teachers only; an admin needs no read.
 - `scenes/(dashboard)/list/gradebook/index.tsx:340-343` — one-off `.then()` inside useEffect. Resolves senior_teacher's `assignedClassId`.
 - `scenes/(dashboard)/list/results/index.tsx:215-217` — one-off `.then()` inside useEffect. Same purpose (senior_teacher class scoping).
 - `scenes/(dashboard)/profile/index.tsx:170-175` — useEffect. Used only as a load-succeeded/failed probe (doesn't consume `.data()`), gates the loading skeleton.
@@ -224,7 +225,7 @@
 - `scenes/(dashboard)/progress-reports/index.tsx:144-146` — no filters. useEffect. Term dropdown (admin generate panel).
 - `scenes/(dashboard)/report-cards/index.tsx:186-190` — no filters. useEffect. Term dropdown.
 - `scenes/(dashboard)/reports/builder/index.tsx:121-123` — no filters. useEffect. Term dropdown.
-- `scenes/(dashboard)/schedule/index.tsx:55-61` — no filters. useEffect (live-mode branch). Term dropdown.
+- _(Removed in the Schedule redesign: the page has no Term dropdown; the week decides the term.)_
 - `scenes/(dashboard)/admin/rebuild-attendance-summaries/index.tsx:30` — no filters. One-off, inside `handleRebuild` click handler. Builds `termId→{startDate,endDate,academicYearId}` map for the rebuild job.
 - `scenes/(dashboard)/admin/grade-entry-tracking/index.tsx:93-106` — no filters. useEffect. Term dropdown/period generation.
 - `scenes/(dashboard)/attendance/gridsheet/index.tsx:287-291` — `orderBy('startDate','desc')`. useEffect. Term dropdown.
@@ -517,7 +518,7 @@ _(No `onSnapshot`/`getDocs` reads against this collection outside generateReport
 
 **onSnapshot — ONE-OFF:**
 
-- `scenes/(dashboard)/schedule/index.tsx` — `where('termId','==',selectedTermId)`. useEffect. Live schedule grid, **staff roles only**. Students and parents (no term picker, issue #50) read their class through `useClassTimetable` (shared cached `getDocs`, below), not a listener.
+- _(Removed in the Schedule redesign: the page's term-wide `onSnapshot` is gone. Staff views read one class or teacher through `useWeekTimetable`; students and parents through `useClassTimetable`. Both are cached `getDocs`, below.)_
 
 **getDocs — ONE-OFF:**
 

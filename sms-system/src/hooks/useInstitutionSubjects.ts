@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/lib/AuthContext';
-import { DATA_MODE } from '@/lib/data';
-import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
-import { fetchSubjects, subjectsQueryKey } from '@/lib/subjectsQuery';
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/AuthContext";
+import { DATA_MODE } from "@/lib/data";
+import { REFERENCE_STALE_MS } from "@/lib/queryPolicies";
+import { fetchSubjects, subjectsQueryKey } from "@/lib/subjectsQuery";
 
 // CORRECTION to the spec's original §7.2 claim: verified directly against
 // firestore.rules (both the flat /subjects/{id} rule, line ~301, and the
@@ -22,16 +22,23 @@ import { fetchSubjects, subjectsQueryKey } from '@/lib/subjectsQuery';
 // any subject's name) should use useAllInstitutionSubjects() below instead.
 // Phase 3a reference-data hook (docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md
 // §5.1, role-branching per §7.2).
-export function useInstitutionSubjects() {
+// `enabled: false` skips the read for a caller that does not need the list (the Schedule page for students and parents).
+export function useInstitutionSubjects({
+  enabled = true,
+}: { enabled?: boolean } = {}) {
   const { institutionId, role, user } = useAuth();
   const uid = user?.uid;
   return useQuery({
-    queryKey: subjectsQueryKey(institutionId ?? '', role, uid),
+    queryKey: subjectsQueryKey(institutionId ?? "", role, uid),
     queryFn: () => fetchSubjects(institutionId as string, role, uid),
     // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
     // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
     staleTime: REFERENCE_STALE_MS,
-    enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
+    enabled:
+      enabled &&
+      DATA_MODE === "live" &&
+      !!institutionId &&
+      institutionId !== "*",
   });
 }
 
@@ -44,9 +51,9 @@ export function useInstitutionSubjects() {
 export function useAllInstitutionSubjects() {
   const { institutionId } = useAuth();
   return useQuery({
-    queryKey: subjectsQueryKey(institutionId ?? '', null, undefined),
+    queryKey: subjectsQueryKey(institutionId ?? "", null, undefined),
     queryFn: () => fetchSubjects(institutionId as string, null, undefined),
     staleTime: REFERENCE_STALE_MS,
-    enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
+    enabled: DATA_MODE === "live" && !!institutionId && institutionId !== "*",
   });
 }

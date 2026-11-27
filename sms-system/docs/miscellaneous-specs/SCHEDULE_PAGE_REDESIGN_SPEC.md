@@ -1,6 +1,6 @@
 # Schedule Page Redesign: Spec
 
-> **Status:** PR A (the week logic, the reads and the cache refresh) is built, in v2.64.1; the page (B) and the tour (C) are still to come. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
+> **Status:** PR A (the week logic, the reads and the cache refresh) shipped in v2.64.1; PR B (the page) is built; the tour (C) is still to come. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
 > **Base:** app v2.64.0. Where this spec says "today", it means the app as of that version.
 > **Model:** the SMS Demo, demo version v1.0.4, live at `https://sms-demo.solutions.genr83d.com/dashboard/schedule`. It was walked as all five roles on 2026-11-27. The demo's source code is private.
 > **Scope of this document:** what the page does and why, for every role. A step-by-step build plan is kept separately and privately; this spec holds every decision.
@@ -46,7 +46,7 @@ Lessons are tinted cards: the subject in the subject colour, then the teacher or
 | D10 | The **"Clash" tag is for staff only**: admin, spectator, senior and regular teachers. Students and parents see both lessons, with no tag. |
 | D11 | **All the extra behaviour is in scope:** holidays and breaks named, the lesson on now ringed, today tinted, the weekly lesson count, page state in the URL, clashes shown, Saturday only when used, and the cache refreshed after edits. |
 | D12 | **Personal timetables** with PDF, image and print export, and **automatic timetable generation**, are BACKLOG entries, not part of this work. |
-| D13 | A **senior teacher's "A teacher" list** comes from the teacher ids and names stored on subjects (`teacherIds` / `teacherNames`). The users rules let a teacher read only students, plus their own department's teachers, so the full staff list isn't readable to them. This needs no rules change and no extra reads. Admin and spectator use the users list. |
+| D13 | A **senior teacher's "A teacher" list** comes from the teacher ids and names stored on subjects (`teacherIds` / `teacherNames`). The users rules let a teacher read only students (and, since PR B, a senior teacher their own department's teachers), so the full staff list isn't readable to them. This needs no extra reads. Admin and spectator use the users list. |
 | D14 | **The week arrows stay within the active academic year** (academic mode) or the active time blocks (custom mode): the calendar data loaded covers only those dates. At an edge the arrow is disabled and a note says the timetable isn't available. |
 | D15 | **A student, or a parent's child, sees one merged personal week** across all their classes, limited to the subjects they take, through `useClassTimetable`. |
 | D16 | **Custom mode: mixed days are decided per lesson.** A day column is greyed only when no running term or block teaches that day. Otherwise each lesson follows its own block: a block's lessons are hidden on that block's own non-school days, and a note under the date names the block and why ("Mechanical Workshop 1: no class, Heroes Day"). |
@@ -184,7 +184,8 @@ src/hooks/
 
 ## 6. Firebase
 
-- **Rules:** no change (D6). The slot rules (`firestore.rules` ~2347–2368) and the admin-only write of `users.canGenerateSchedule` stay as they are.
+- **Rules:** one clause, added in PR B. A senior teacher may read the `users` profiles of teachers in their own department (`departmentId` equal to theirs, compared by id), which the slot form's teacher list and the page's edit check need (D8, D13). Before it, the rules allowed teachers to read students only, so a senior teacher's teacher list was empty and the department check could never pass. Rules test: `rules-tests/departmentTeachers.rules.test.ts`. Deploy the rules before the build. The slot rules (`firestore.rules` ~2347–2368) and the admin-only write of `users.canGenerateSchedule` are unchanged (D6).
+- **Privacy:** rules can't limit fields, so a senior teacher can read the whole profile document of each teacher in their own department (for example phone and address), not only the name. Accepted by the owner (2026-11-27) as the price of keeping the department limit without a server.
 - **Collections:** none new; the `timetable_slots` shape is unchanged.
 - **Indexes:** none. Every query is "equals" on one field plus `in` on `termId`, which BigCalender already runs without a composite index.
 - **The senior teacher's teacher list** comes from subjects, which are already cached reference data, so it costs no reads (D13).

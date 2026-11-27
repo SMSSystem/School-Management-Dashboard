@@ -4,50 +4,62 @@ import { useForm } from "react-hook-form";
 import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import {
-  addDoc, collection, getDocs, query, serverTimestamp, updateDoc, where,
+  addDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import InputField from "../InputField";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
-import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
+import {
+  DATA_MODE,
+  classesData,
+  subjectsData,
+  teachersData,
+  termsData,
+} from "@/lib/data";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useTeachingStaff } from "@/hooks/useTeachingStaff";
+import { useDepartmentTeachers } from "@/hooks/useDepartmentTeachers";
 
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
 type DayKey = (typeof DAY_KEYS)[number];
 
 const DAY_OPTIONS: { key: DayKey; label: string }[] = [
-  { key: 'mon', label: 'Mon' },
-  { key: 'tue', label: 'Tue' },
-  { key: 'wed', label: 'Wed' },
-  { key: 'thu', label: 'Thu' },
-  { key: 'fri', label: 'Fri' },
-  { key: 'sat', label: 'Sat' },
+  { key: "mon", label: "Mon" },
+  { key: "tue", label: "Tue" },
+  { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" },
+  { key: "fri", label: "Fri" },
+  { key: "sat", label: "Sat" },
 ];
 
 const schema = z.object({
-  termId:    z.string().min(1, 'Term is required'),
-  subjectId: z.string().min(1, 'Subject is required'),
-  teacherId: z.string().min(1, 'Teacher is required'),
-  classId:   z.string().min(1, 'Class is required'),
-  days:      z.array(z.enum(DAY_KEYS)).min(1, 'Select at least one day'),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
-  duration:  z.coerce
-              .number()
-              .min(15, 'Minimum duration is 15 minutes')
-              .max(480, 'Maximum duration is 8 hours (480 minutes)'),
-  room:      z.string().optional(),
+  termId: z.string().min(1, "Term is required"),
+  subjectId: z.string().min(1, "Subject is required"),
+  teacherId: z.string().min(1, "Teacher is required"),
+  classId: z.string().min(1, "Class is required"),
+  days: z.array(z.enum(DAY_KEYS)).min(1, "Select at least one day"),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+  duration: z.coerce
+    .number()
+    .min(15, "Minimum duration is 15 minutes")
+    .max(480, "Maximum duration is 8 hours (480 minutes)"),
+  room: z.string().optional(),
 });
 
-type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
+type FormData = Partial<
+  Record<string, string | number | readonly string[] | undefined>
+>;
 type DropdownItem = { id: string; name: string };
 
 function formatDuration(minutes: number): string {
-  if (!minutes || isNaN(minutes) || minutes <= 0) return '';
+  if (!minutes || isNaN(minutes) || minutes <= 0) return "";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m}m`;
@@ -56,7 +68,7 @@ function formatDuration(minutes: number): string {
 }
 
 function timeToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
+  const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
 
@@ -69,11 +81,11 @@ const TimetableSlotForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { user, role, institutionId, department } = useAuth();
+  const { user, role, institutionId, departmentId } = useAuth();
 
   const { data: rawTerms } = useInstitutionTerms();
   const terms = useMemo<DropdownItem[]>(() => {
-    if (DATA_MODE === 'live') {
+    if (DATA_MODE === "live") {
       return [...(rawTerms ?? [])]
         .sort((a, b) => b.startDate.localeCompare(a.startDate))
         .map((t) => ({ id: t.id, name: t.name }));
@@ -82,28 +94,33 @@ const TimetableSlotForm = ({
   }, [rawTerms]);
   const { data: rawSubjects } = useAllInstitutionSubjects();
   const subjects = useMemo<DropdownItem[]>(() => {
-    if (DATA_MODE === 'live') {
+    if (DATA_MODE === "live") {
       return (rawSubjects ?? []).map((s) => ({ id: s.id, name: s.name }));
     }
     return subjectsData.map((s) => ({ id: String(s.id), name: s.name }));
   }, [rawSubjects]);
   // An admin picks from the shared cached teaching staff (hooks/useTeachingStaff.ts); a senior teacher is limited
   // to their own department and reads just that (the users rules allow no wider query for them).
-  const deptScoped = role === 'senior_teacher' && !!department;
-  const { staff } = useTeachingStaff({ enabled: DATA_MODE === 'live' && !deptScoped });
-  const [deptTeachers, setDeptTeachers] = useState<DropdownItem[]>([]);
+  const deptScoped = role === "senior_teacher" && !!departmentId;
+  const { staff } = useTeachingStaff({
+    enabled: DATA_MODE === "live" && !deptScoped,
+  });
+  // The senior teacher's department teachers: one cached read, shared with the Schedule page's edit check.
+  const { teachers: deptTeachers } = useDepartmentTeachers(departmentId, {
+    enabled: deptScoped,
+  });
   const teachers = useMemo<DropdownItem[]>(
     () =>
-      DATA_MODE !== 'live'
-        ? teachersData.map(t => ({ id: t.teacherId, name: t.name }))
+      DATA_MODE !== "live"
+        ? teachersData.map((t) => ({ id: t.teacherId, name: t.name }))
         : deptScoped
           ? deptTeachers
-          : staff.map(s => ({ id: s.id, name: s.name })),
+          : staff.map((s) => ({ id: s.id, name: s.name })),
     [deptScoped, deptTeachers, staff],
   );
   const { data: rawClasses } = useInstitutionClasses();
   const classes = useMemo<DropdownItem[]>(() => {
-    if (DATA_MODE === 'live') {
+    if (DATA_MODE === "live") {
       return (rawClasses ?? []).map((c) => ({ id: c.id, name: c.name }));
     }
     return classesData.map((c) => ({ id: String(c.id), name: c.name }));
@@ -111,7 +128,7 @@ const TimetableSlotForm = ({
   const [selectedDays, setSelectedDays] = useState<DayKey[]>(() => {
     if (!Array.isArray(data?.days)) return [];
     return (data.days as string[]).filter((d): d is DayKey =>
-      (DAY_KEYS as readonly string[]).includes(d)
+      (DAY_KEYS as readonly string[]).includes(d),
     );
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -126,79 +143,74 @@ const TimetableSlotForm = ({
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema) });
 
-  const watchedTermId    = watch('termId');
-  const watchedTeacherId = watch('teacherId');
-  const watchedStartTime = watch('startTime');
-  const watchedDuration  = watch('duration');
+  const watchedTermId = watch("termId");
+  const watchedTeacherId = watch("teacherId");
+  const watchedStartTime = watch("startTime");
+  const watchedDuration = watch("duration");
 
   // Keep react-hook-form in sync with the days checkbox state
   useEffect(() => {
-    setValue('days', selectedDays, { shouldValidate: true });
+    setValue("days", selectedDays, { shouldValidate: true });
   }, [selectedDays, setValue]);
-
-  // The senior teacher's department teachers (live mode only).
-  useEffect(() => {
-    if (!institutionId || DATA_MODE !== 'live' || !deptScoped) return;
-    getDocs(
-      query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
-        where('role', 'in', ['regular_teacher', 'senior_teacher']),
-        where('departmentId', '==', department),
-      ),
-    ).then(
-      snap => setDeptTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }))),
-      onLoadError('the teachers to choose from'),
-    );
-  }, [institutionId, deptScoped, department]);
 
   // Reset conflict state when any field that affects conflict detection changes
   useEffect(() => {
     setConflictWarning(null);
     awaitingConflictConfirm.current = false;
-  }, [watchedTermId, watchedTeacherId, watchedStartTime, watchedDuration, selectedDays]);
+  }, [
+    watchedTermId,
+    watchedTeacherId,
+    watchedStartTime,
+    watchedDuration,
+    selectedDays,
+  ]);
 
-  const durationValue = watch('duration');
+  const durationValue = watch("duration");
 
   const toggleDay = (day: DayKey) =>
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    setSelectedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
     );
 
   const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
 
-    if (DATA_MODE === 'live' && !awaitingConflictConfirm.current) {
+    if (DATA_MODE === "live" && !awaitingConflictConfirm.current) {
       if (!institutionId) return;
-      const snap = await getDocs(query(
-        institutionCollection(institutionId, 'timetable_slots'),
-        where('termId', '==', formData.termId),
-      ));
-      const editId = type === 'update' ? String(data?.id ?? '') : '';
+      const snap = await getDocs(
+        query(
+          institutionCollection(institutionId, "timetable_slots"),
+          where("termId", "==", formData.termId),
+        ),
+      );
+      const editId = type === "update" ? String(data?.id ?? "") : "";
       const newStart = timeToMinutes(formData.startTime);
-      const newEnd   = newStart + formData.duration;
-      const conflict = snap.docs.find(d => {
+      const newEnd = newStart + formData.duration;
+      const conflict = snap.docs.find((d) => {
         if (d.id === editId) return false;
         const s = d.data();
         if (s.teacherId !== formData.teacherId) return false;
         // Malformed legacy docs (missing days/startTime) can't be reliably
         // conflict-checked — skip them rather than crash.
-        if (!Array.isArray(s.days) || typeof s.startTime !== 'string') return false;
-        const sharedDay = formData.days.some(day => (s.days as string[]).includes(day));
+        if (!Array.isArray(s.days) || typeof s.startTime !== "string")
+          return false;
+        const sharedDay = formData.days.some((day) =>
+          (s.days as string[]).includes(day),
+        );
         if (!sharedDay) return false;
         const sStart = timeToMinutes(s.startTime as string);
-        const sEnd   = sStart + (s.duration as number);
+        const sEnd = sStart + (s.duration as number);
         return newStart < sEnd && newEnd > sStart;
       });
       if (conflict) {
         const s = conflict.data();
         const sharedDays = formData.days
-          .filter(d => (s.days as string[]).includes(d))
-          .map(d => DAY_OPTIONS.find(o => o.key === d)?.label ?? d)
-          .join(', ');
+          .filter((d) => (s.days as string[]).includes(d))
+          .map((d) => DAY_OPTIONS.find((o) => o.key === d)?.label ?? d)
+          .join(", ");
         setConflictWarning(
-          `Teacher already has "${s.subjectName as string}" on ${sharedDays} at ${s.startTime as string}. Submit again to save anyway.`
+          `Teacher already has "${s.subjectName as string}" on ${sharedDays} at ${s.startTime as string}. Submit again to save anyway.`,
         );
         awaitingConflictConfirm.current = true;
         return;
@@ -209,69 +221,78 @@ const TimetableSlotForm = ({
     awaitingConflictConfirm.current = false;
 
     try {
-      const termName    = terms.find(t => t.id === formData.termId)?.name    ?? '';
-      const subjectName = subjects.find(s => s.id === formData.subjectId)?.name ?? '';
-      const teacherName = teachers.find(t => t.id === formData.teacherId)?.name ?? '';
-      const className   = classes.find(c => c.id === formData.classId)?.name  ?? '';
+      const termName = terms.find((t) => t.id === formData.termId)?.name ?? "";
+      const subjectName =
+        subjects.find((s) => s.id === formData.subjectId)?.name ?? "";
+      const teacherName =
+        teachers.find((t) => t.id === formData.teacherId)?.name ?? "";
+      const className =
+        classes.find((c) => c.id === formData.classId)?.name ?? "";
 
       if (!institutionId) return;
-      if (type === 'create') {
-        await addDoc(institutionCollection(institutionId, 'timetable_slots'), {
+      if (type === "create") {
+        await addDoc(institutionCollection(institutionId, "timetable_slots"), {
           ...formData,
           termName,
           subjectName,
           teacherName,
           className,
           institutionId,
-          createdBy:     user?.uid ?? '',
-          createdByRole: role ?? '',
-          createdAt:     serverTimestamp(),
+          createdBy: user?.uid ?? "",
+          createdByRole: role ?? "",
+          createdAt: serverTimestamp(),
         });
       } else {
         const id = data?.id;
-        if (typeof id !== 'string') {
+        if (typeof id !== "string") {
           missingId.show();
           return;
         }
-        await updateDoc(institutionDoc(institutionId, 'timetable_slots', id), {
+        await updateDoc(institutionDoc(institutionId, "timetable_slots", id), {
           termId: formData.termId,
           termName,
           subjectId: formData.subjectId,
           subjectName,
           teacherId: formData.teacherId,
           teacherName,
-          classId:   formData.classId,
+          classId: formData.classId,
           className,
-          days:      formData.days,
+          days: formData.days,
           startTime: formData.startTime,
-          duration:  formData.duration,
-          room:      formData.room,
+          duration: formData.duration,
+          room: formData.room,
         });
       }
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to save timetable slot.');
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to save timetable slot.",
+      );
     }
   });
 
   return (
     <form className="flex flex-col gap-8" onSubmit={onSubmit}>
       <h1 className="text-xl font-semibold">
-        {type === 'create' ? 'Add timetable slot' : 'Edit timetable slot'}
+        {type === "create" ? "Add timetable slot" : "Edit timetable slot"}
       </h1>
 
       <div className="flex justify-between flex-wrap gap-4">
         {/* Term */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Term
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register('termId')}
+            {...register("termId")}
             defaultValue={data?.termId as string | undefined}
           >
             <option value="">Select a term</option>
-            {terms.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {terms.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </select>
           {errors.termId?.message && (
@@ -281,15 +302,19 @@ const TimetableSlotForm = ({
 
         {/* Subject */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Subject</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Subject
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register('subjectId')}
+            {...register("subjectId")}
             defaultValue={data?.subjectId as string | undefined}
           >
             <option value="">Select a subject</option>
-            {subjects.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </select>
           {errors.subjectId?.message && (
@@ -299,15 +324,19 @@ const TimetableSlotForm = ({
 
         {/* Teacher */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Teacher</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Teacher
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register('teacherId')}
+            {...register("teacherId")}
             defaultValue={data?.teacherId as string | undefined}
           >
             <option value="">Select a teacher</option>
-            {teachers.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </select>
           {errors.teacherId?.message && (
@@ -317,15 +346,19 @@ const TimetableSlotForm = ({
 
         {/* Class */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Class</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Class
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register('classId')}
+            {...register("classId")}
             defaultValue={data?.classId as string | undefined}
           >
             <option value="">Select a class</option>
-            {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
           {errors.classId?.message && (
@@ -345,17 +378,21 @@ const TimetableSlotForm = ({
 
         {/* Duration */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Duration (minutes)</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Duration (minutes)
+          </label>
           <input
             type="number"
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register('duration')}
+            {...register("duration")}
             defaultValue={data?.duration as number | undefined}
             min={15}
             max={480}
           />
           {Number(durationValue) > 0 && !isNaN(Number(durationValue)) && (
-            <p className="text-xs text-gray-400">= {formatDuration(Number(durationValue))}</p>
+            <p className="text-xs text-gray-400">
+              = {formatDuration(Number(durationValue))}
+            </p>
           )}
           {errors.duration?.message && (
             <p className="text-xs text-red-400">{errors.duration.message}</p>
@@ -373,10 +410,15 @@ const TimetableSlotForm = ({
 
         {/* Days */}
         <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Days</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Days
+          </label>
           <div className="flex gap-4 flex-wrap">
             {DAY_OPTIONS.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <label
+                key={key}
+                className="flex items-center gap-1.5 text-sm cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   checked={selectedDays.includes(key)}
@@ -396,16 +438,14 @@ const TimetableSlotForm = ({
       {conflictWarning && (
         <p className="text-xs text-amber-500">{conflictWarning}</p>
       )}
-      {submitError && (
-        <p className="text-xs text-red-400">{submitError}</p>
-      )}
+      {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
       {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}
       >
-        {isSubmitting ? 'Saving…' : type === 'create' ? 'Add Slot' : 'Update'}
+        {isSubmitting ? "Saving…" : type === "create" ? "Add Slot" : "Update"}
       </button>
     </form>
   );

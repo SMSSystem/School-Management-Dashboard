@@ -34,6 +34,7 @@ const SPLIT_PAGES = [
   "list/gradebook/index.tsx",
   "import/index.tsx",
   "profile/index.tsx",
+  "schedule/DelegateAccessPanel.tsx",
 ];
 
 // Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
@@ -220,9 +221,12 @@ const CLASSIFIED: Record<string, Classified> = {
       /\{showPanel && isAdmin && \(/,
     ],
   },
-  "schedule/index.tsx": {
-    why: "the schedule-access toggle panel is institution_admin only",
-    guards: [/role === 'institution_admin' && \(/],
+  // Moved out of schedule/index.tsx (Schedule redesign PR B); its guard is the page's mount, checked on the folder.
+  "schedule/DelegateAccessPanel.tsx": {
+    why: "the schedule-access toggle panel is mounted for institution_admin only",
+    guards: [
+      /role === ["']institution_admin["'] && \(?\s*<DelegateAccessPanel/,
+    ],
   },
 };
 
