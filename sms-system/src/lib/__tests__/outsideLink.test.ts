@@ -44,7 +44,12 @@ describe("every outside link", () => {
     expect(flat(linksSrc)).toContain(
       flat('window.open(url, "_blank", "noopener,noreferrer");'),
     );
-    expect(flat(dialogSrc)).toContain(flat("openOutside(url);"));
+    // It shows, and opens, the browser's own form of the address (punycode for lookalike letters).
+    expect(flat(dialogSrc)).toContain(
+      flat("const shown = parseWebUrl(url)?.href ?? url;"),
+    );
+    expect(flat(dialogSrc)).toContain(flat("openOutside(shown);"));
+    expect(flat(dialogSrc)).toContain(flat("{shown}"));
   });
 
   it("goes through OutsideLink, asking for teacher links and the changelog, not for the footer", () => {

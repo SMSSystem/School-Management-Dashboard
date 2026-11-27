@@ -33,6 +33,13 @@ describe("parseWebUrl", () => {
     expect(parseUrl("/dashboard")).toBeNull();
   });
 
+  it("gives a lookalike hostname in punycode, so its letters from another alphabet show", () => {
+    // "exаmple.com" with a Cyrillic "а" (U+0430)
+    expect(parseWebUrl("https://exаmple.com/x")?.href).toBe(
+      "https://xn--exmple-4nf.com/x",
+    );
+  });
+
   it("tells a parsed address's kind", () => {
     expect(isWebUrl(new URL("https://a.test"))).toBe(true);
     expect(isWebUrl(new URL("mailto:a@b.com"))).toBe(false);
