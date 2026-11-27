@@ -356,7 +356,7 @@ The Schedule page shows one week of a class's or a teacher's timetable on real d
 4. Switch between **Week** (a grid with a row per start time) and **Day** (one day as a list, picked with the day chips). Phones always show Day.
 5. Holidays and breaks are greyed with their name. **Free time** marks a gap of 15 minutes or more. The lesson on now has a ring, and today's column is tinted. Lessons that overlap show a red **Clash** tag, and the footer counts the week's lessons and clashes.
 6. **Add slot** creates a timetable slot; each lesson has **Edit** and **Delete** buttons. A change shows on your own screen at once; others see it within ten minutes.
-7. **Delegate Schedule Access** (a collapsible panel) lets senior teachers create and edit slots, one toggle per teacher. Every grant and revoke is recorded in the Activity log.
+7. **Delegate Schedule Access** (a collapsible panel) lets senior teachers create and edit slots, one toggle per teacher. Every grant and revoke is recorded in the Audit Log.
 
 The page address keeps what you chose (class or teacher, week, view and day), so you can bookmark or share it with other staff.
 

@@ -6,7 +6,9 @@ import type { Role } from "@/types/people";
 // page's "Take a tour" button, never by itself, and it never opens a dialog or asks anyone to act. Like the Rubrics
 // tour, it spotlights only what is always on the page once the timetable is drawn (the button shows only then);
 // anything that may be missing (a parent's child chips, a senior teacher's editing access) is explained in a centred
-// step instead. The steps come from the role alone, because useTourSteps builds every tour from the role.
+// step instead. The steps come from the role alone, because useTourSteps builds every tour from the role. The card is
+// centred under its target, so a narrow target at a screen edge (the heading on the left, Add slot on the right) aligns
+// the card to that edge instead, or on a phone it would run off the screen.
 
 const step = pageTourStep;
 
@@ -15,16 +17,19 @@ const HEADING = {
     "Your schedule",
     "This is the timetable laid on real dates: the weekly pattern of lessons, with holidays and breaks taken out. The title under Schedule names whose week you are looking at.",
     "#tour-schedule-heading",
+    "bottom-left",
   ),
   student: step(
     "Your timetable",
     "This is your week on real dates, across all your classes, with holidays and breaks taken out.",
     "#tour-schedule-heading",
+    "bottom-left",
   ),
   parent: step(
     "Your child's timetable",
     "This is your child's week on real dates, across all their classes, with holidays and breaks taken out.",
     "#tour-schedule-heading",
+    "bottom-left",
   ),
 };
 
@@ -48,7 +53,7 @@ const CHILDREN = step(
 
 const WEEK_NAV = step(
   "Moving through weeks",
-  "Use ‹ and › to move a week at a time and Today to come back. The arrows stop at the first and last weeks of the school year, with a note saying so. Week shows the whole week as a grid; Day shows one day as a list. Phones always show Day.",
+  "Use ‹ and › to move a week at a time and Today to come back. The arrows stop at the first and last weeks of the school year (or the active time blocks), with a note saying so. Week shows the whole week as a grid; Day shows one day as a list. Phones always show Day.",
   "#tour-schedule-week-nav",
 );
 
@@ -72,6 +77,7 @@ const EDIT = {
     "Adding and changing lessons",
     "Add slot creates a timetable slot: a subject, teacher, class, days, start time and length. Each lesson has Edit and Delete buttons. This is the editor until the Lessons feature arrives.",
     "#tour-schedule-add",
+    "bottom-right",
   ),
   senior: step(
     "Adding and changing lessons",
@@ -81,7 +87,7 @@ const EDIT = {
 
 const DELEGATE = step(
   "Giving access",
-  "Delegate Schedule Access lets chosen senior teachers add and edit slots for their own department. Every grant and revoke is recorded in the Activity log.",
+  "Delegate Schedule Access lets chosen senior teachers add and edit slots for their own department. Every grant and revoke is recorded in the Audit Log.",
   "#tour-schedule-delegate",
 );
 

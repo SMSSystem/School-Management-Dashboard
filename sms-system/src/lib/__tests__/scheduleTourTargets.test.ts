@@ -54,6 +54,19 @@ describe("the schedule tour", () => {
   });
 });
 
+describe("where the card sits", () => {
+  it("aligns the card to the edge of a narrow target at the side of the screen, so it fits a phone", () => {
+    for (const role of ROLES) {
+      for (const s of scheduleTourSteps(role)) {
+        if (s.selector === "#tour-schedule-heading")
+          expect(s.side, role).toBe("bottom-left");
+        if (s.selector === "#tour-schedule-add")
+          expect(s.side, role).toBe("bottom-right");
+      }
+    }
+  });
+});
+
 describe("the steps each role sees", () => {
   it("shows the class or teacher choice to admin, spectator and senior teacher only", () => {
     for (const role of ROLES) {
