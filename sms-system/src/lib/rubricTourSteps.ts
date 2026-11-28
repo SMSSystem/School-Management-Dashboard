@@ -1,4 +1,5 @@
 import type { Step } from "nextstepjs";
+import { pageTourStep } from "./pageTourStep";
 import type { Role } from "@/types/people";
 
 // The Rubrics page's tour (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 15.2). It is started by the page's
@@ -6,19 +7,7 @@ import type { Role } from "@/types/people";
 // validation gates. Only things that are always on the page are targeted; the rest are centred, because a school with no
 // rubrics has no rows. A read-only account sees the steps about viewing only, with its own wording.
 
-const step = (
-  title: string,
-  content: string,
-  selector?: string,
-  side: Step["side"] = "bottom",
-): Step => ({
-  icon: null,
-  title,
-  content,
-  ...(selector && { selector, side, viewportID: "main-viewport" }),
-  showControls: true,
-  showSkip: true,
-});
+const step = pageTourStep;
 
 const INTRO = step(
   "Rubrics",

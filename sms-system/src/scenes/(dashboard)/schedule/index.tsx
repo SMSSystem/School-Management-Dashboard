@@ -5,8 +5,10 @@
 //
 // "Add slot" and the Edit and Delete buttons on a card are the interim editor until the Lessons feature (BACKLOG).
 
+import { useNextStep } from "nextstepjs";
 import FormModal from "@/components/FormModal";
 import type { FormRecord } from "@/components/formRegistry";
+import { useSidebar } from "@/lib/SidebarContext";
 import {
   addDays,
   type WeekCell,
@@ -102,17 +104,22 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
     />
   );
 
+  // The tour's timetable step points at the TOP of the timetable (the day chips, the grid's header row or the
+  // nothing-scheduled line), never the whole of it: a full week is taller than the screen, and the tour would place
+  // its card above the target, off the screen.
   let main;
   if (state.view === "day" && selectedDay) {
     main = (
       <>
-        <ScheduleDayChips
-          days={week.days}
-          selected={selectedDay.date}
-          withClasses={datesWithClasses(week)}
-          mode={calendar.mode}
-          onSelect={(day) => setState({ ...state, day })}
-        />
+        <div id="tour-schedule-timetable">
+          <ScheduleDayChips
+            days={week.days}
+            selected={selectedDay.date}
+            withClasses={datesWithClasses(week)}
+            mode={calendar.mode}
+            onSelect={(day) => setState({ ...state, day })}
+          />
+        </div>
         <ScheduleDayList
           week={week}
           day={selectedDay}
@@ -123,7 +130,10 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
     );
   } else if (week.lessonCount === 0) {
     main = (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
+      <p
+        id="tour-schedule-timetable"
+        className="text-sm text-gray-500 dark:text-gray-400"
+      >
         {emptyWeekMessage(week, calendar.mode)}
       </p>
     );
@@ -134,6 +144,7 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
         mode={calendar.mode}
         caption={`${title ?? SCHEDULE_TEXT.heading}, week of ${page.rangeLabel}`}
         renderCard={renderCard}
+        headId="tour-schedule-timetable"
       />
     );
   }
@@ -142,6 +153,59 @@ function ScheduleBody({ page, title }: { page: Page; title?: string }) {
     <div className="flex flex-col gap-4">
       {main}
       <WeekFooter page={page} staff={staff} />
+    </div>
+  );
+}
+
+/** "Take a tour": the page tour (lib/scheduleTourSteps.ts), started only by this button, never by itself. */
+function TourButton() {
+  const { startNextStep } = useNextStep();
+  const { collapseForTour } = useSidebar();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        collapseForTour();
+        startNextStep("schedule");
+      }}
+      className="min-h-11 md:min-h-9 rounded-md border border-gray-300 px-3 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+    >
+      Take a tour
+    </button>
+  );
+}
+
+/** The heading (Schedule and whose week), "Take a tour" once the timetable is drawn, and Add slot for editors. */
+function ScheduleHeader({
+  title,
+  showTour,
+  mayEdit,
+}: {
+  title?: string;
+  showTour: boolean;
+  mayEdit: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between flex-wrap gap-3">
+      <div id="tour-schedule-heading">
+        <h1 className="text-lg font-semibold">{SCHEDULE_TEXT.heading}</h1>
+        {title && (
+          <h2 className="text-sm text-gray-600 dark:text-gray-300">{title}</h2>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        {/* The tour spotlights only what is on the page, so it is offered only once the timetable is drawn. */}
+        {showTour && <TourButton />}
+        {mayEdit && (
+          <span id="tour-schedule-add">
+            <FormModal
+              table="timetable_slot"
+              type="create"
+              triggerLabel="Add slot"
+            />
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -168,23 +232,7 @@ const SchedulePage = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4 flex flex-col gap-4 min-w-0">
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">{SCHEDULE_TEXT.heading}</h1>
-          {title && (
-            <h2 className="text-sm text-gray-600 dark:text-gray-300">
-              {title}
-            </h2>
-          )}
-        </div>
-        {page.mayEdit && (
-          <FormModal
-            table="timetable_slot"
-            type="create"
-            triggerLabel="Add slot"
-          />
-        )}
-      </div>
+      <ScheduleHeader title={title} showTour={!empty} mayEdit={page.mayEdit} />
 
       {role === "institution_admin" && <DelegateAccessPanel />}
 

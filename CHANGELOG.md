@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.65.0 · **Last updated:** 2026-11-27
+**Current version:** v2.66.0 · **Last updated:** 2026-11-27
 
 ## Unreleased
 
@@ -10,8 +10,22 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.65.0"></a>
+<a id="v2.66.0"></a>
 <details open>
+<summary><strong>v2.66.0</strong> · 2026-11-27 · Schedule Page Tour (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/130">#130</a>)</summary>
+
+**Added**
+
+- A tour of the Schedule page: the **Take a tour** button beside the heading walks you through whose week it is, moving between weeks, the timetable and, for those who can, adding lessons and giving access. Each role sees the steps that apply to it, and the tour never starts by itself.
+
+**Fixed**
+
+- The tour cards fit a phone screen. They were 448 px wide and ran off a 375 px screen, which matters now that students and parents have a page tour.
+
+</details>
+
+<a id="v2.65.0"></a>
+<details>
 <summary><strong>v2.65.0</strong> · 2026-11-27 · Week and Day Schedule (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/129">#129</a>)</summary>
 
 **Added**

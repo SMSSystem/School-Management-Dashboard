@@ -19,6 +19,8 @@ type Props = {
   /** "Grade 5A, week of 23–27 Nov 2026", for screen readers. */
   caption: string;
   renderCard: (cell: WeekCell<CardSlot>, row: WeekRow) => ReactNode;
+  /** An id for the header row (the page tour's timetable step points at it). */
+  headId?: string;
 };
 
 // The week view: a table with dated day columns and one row per start time (D4). The header row and the time column
@@ -28,6 +30,7 @@ export default function ScheduleWeekGrid({
   mode,
   caption,
   renderCard,
+  headId,
 }: Props) {
   return (
     <div
@@ -38,7 +41,7 @@ export default function ScheduleWeekGrid({
     >
       <table className="w-full min-w-2xl border-collapse text-sm">
         <caption className="sr-only">{caption}</caption>
-        <thead>
+        <thead id={headId}>
           <tr>
             <th
               scope="col"

@@ -1,6 +1,6 @@
 # Schedule Page Redesign: Spec
 
-> **Status:** PR A (the week logic, the reads and the cache refresh) shipped in v2.64.1; PR B (the page) is built; the tour (C) is still to come. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
+> **Status:** PR A (the week logic, the reads and the cache refresh) shipped in v2.64.1; PR B (the page) shipped in v2.65.0; PR C (the tour) is built. First written 2026-11-27 and revised the same day (section 12). The owner's decisions are D1–D18 (section 2).
 > **Base:** app v2.64.0. Where this spec says "today", it means the app as of that version.
 > **Model:** the SMS Demo, demo version v1.0.4, live at `https://sms-demo.solutions.genr83d.com/dashboard/schedule`. It was walked as all five roles on 2026-11-27. The demo's source code is private.
 > **Scope of this document:** what the page does and why, for every role. A step-by-step build plan is kept separately and privately; this spec holds every decision.
@@ -197,8 +197,7 @@ A page tour `schedule`, started by a "Take a tour" button, in the same pattern a
 
 The steps come from `scheduleTourSteps(role)`, from **the role only**, as `rubricTourSteps` does, because `useTourSteps` builds every tour from the role alone.
 
-- **Sometimes-missing targets** (no editing access, one child, a phone) stay mounted, empty and hidden.
-- A step whose element is hidden is skipped with the check in `tourValidation.ts`. If a step can't be skipped, it falls back to the heading and explains when the control appears.
+- **As built (PR C, 2026-11-27), like the Rubrics tour:** `tourValidation.ts` only blocks "Next" until something is done, so it can't skip a step. Instead the tour spotlights only what is always on the page once the timetable is drawn (the button shows only then), and explains anything that may be missing in a centred step: a parent's child chips, and a senior teacher's Add slot (it depends on access). Week/Day is part of the week-controls step (`#tour-schedule-week-nav`), and the timetable step targets `#tour-schedule-timetable`, the grid or the day list. Tested in `src/lib/__tests__/scheduleTourTargets.test.ts`.
 
 | Step | Target | Roles |
 |---|---|---|

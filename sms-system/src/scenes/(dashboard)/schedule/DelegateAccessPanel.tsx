@@ -95,7 +95,10 @@ export default function DelegateAccessPanel() {
   }
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-md">
+    <div
+      id="tour-schedule-delegate"
+      className="border border-gray-200 dark:border-gray-700 rounded-md"
+    >
       <button
         type="button"
         aria-expanded={panelOpen}
